@@ -11,12 +11,18 @@ import qualified Data.Set as S
 import Data.Set (Set)
 import Data.Text (Text)
 import qualified Data.Text as T
-import SpecHelper
 
 import Control.Arrow
 import Data.Attoparsec.Text as P
 import qualified Data.Attoparsec.Text (Parser)
+import Foreign.Marshal.Utils as FMU
+import Data.Monoid
+import Data.Coerce
+import Data.Foldable as Fold
 import Day2Input
+
+import SpecHelper
+
 
 type BoxId = Text
 
@@ -30,7 +36,7 @@ type BoxIdProjection = (HasCount2, HasCount3)
 
 type ChecksumFunc = BoxIdSet -> Checksum
 
-type Checksum = Int
+type Checksum = Product Int
 
 boxProject :: BoxId -> BoxIdProjection
 boxProject box = count $ countLetters box
@@ -40,24 +46,19 @@ boxProject box = count $ countLetters box
     count :: MultiSet Char -> BoxIdProjection
     count = MS.foldOccur count' (False, False)
     count' :: Char -> Int -> BoxIdProjection -> BoxIdProjection
-    count' _ n (_, b)
-      | n == 2 = (True, b)
-    count' _ n (b, _)
-      | n == 3 = (b, True)
+    count' _ 2 (_, b) = (True, b)
+    count' _ 3 (b, _) = (b, True)
     count' _ _ hc = hc
 
 checksum :: BoxIdSet -> Checksum
 checksum = checksum' . map boxProject
 
-checksum' :: Foldable f => f BoxIdProjection -> Checksum
-checksum' = uncurry (*) . merge'
+checksum' :: (Foldable f, Functor f) => f BoxIdProjection -> Checksum
+checksum' = coerce . uncurry (*) . fold . fmap cnv
   where
-    merge' = foldr inc'' (0 :: Int, 0 :: Int)
-    step :: Bool -> Int -> Int
-    step True = (+) 1
-    step False = id
-    inc'' :: BoxIdProjection -> (Int, Int) -> (Int, Int)
-    inc'' a b = (step (fst a) (fst b), step (snd a) (snd b))
+    cnv :: BoxIdProjection -> (Sum Int, Sum Int)
+    cnv = FMU.fromBool *** FMU.fromBool
+
 
 solve :: BoxIdSet -> Checksum
 solve = checksum
