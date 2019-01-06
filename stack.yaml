@@ -1,3 +1,4 @@
 resolver: lts-13.1
 packages: 
-  - Day1
+  - Day2 
+  - Day1  
