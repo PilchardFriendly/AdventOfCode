@@ -46,9 +46,9 @@ boxProject box = count $ countLetters box
     count :: MultiSet Char -> BoxIdProjection
     count = MS.foldOccur count' (False, False)
     count' :: Char -> Int -> BoxIdProjection -> BoxIdProjection
-    count' _ 2 (_, b) = (True, b)
-    count' _ 3 (b, _) = (b, True)
-    count' _ _ hc = hc
+    count' _ 2  = first $ const True
+    count' _ 3 = second $ const True
+    count' _ _ = id
 
 checksum :: BoxIdSet -> Checksum
 checksum = checksum' . map boxProject
