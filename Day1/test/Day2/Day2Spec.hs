@@ -4,16 +4,20 @@ module Day2.Day2Spec
   ( spec
   ) where
 
-import Data.Char (isAlpha)
+import Data.Maybe (catMaybes)
+import Data.Char (isAlpha, ord)
+import Data.Int (Int32, Int8)
+import qualified Data.Bits as B
+import Data.Bits (Bits, zeroBits, setBit)
 import Data.MultiSet (MultiSet)
 import qualified Data.MultiSet as MS
 import qualified Data.Set as S
 import Data.Set (Set)
-import Data.Text (Text)
+import Data.Text (Text,pack)
 import qualified Data.Text as T
 
 import Control.Arrow
-import Data.Attoparsec.Text as P
+import Data.Attoparsec.Text as P hiding (take)
 import qualified Data.Attoparsec.Text (Parser)
 import Foreign.Marshal.Utils as FMU
 import Data.Monoid
@@ -22,6 +26,7 @@ import Data.Foldable as Fold
 import Day2.Input
 
 import SpecHelper
+import Data.String.Combinators (doubleQuotes)
 
 
 type BoxId = Text
@@ -59,6 +64,28 @@ checksum' = coerce . uncurry (*) . fold . fmap cnv
     cnv :: BoxIdProjection -> (Sum Int, Sum Int)
     cnv = FMU.fromBool *** FMU.fromBool
 
+newtype Discriminator a = MkDiscriminator (Set a)
+instance Ord a => Eq ( Discriminator a) where
+  (==) (MkDiscriminator a) (MkDiscriminator b) = not $ S.disjoint a b
+
+-- discriminate :: Text -> Maybe (Discriminator Int32)
+-- discriminate s = catMaybes mapM_ maybeAscii
+--   where
+--     maybeAscii :: Char -> Maybe Int32
+indices :: Text -> Set Int8
+indices s = S.fromList $ catMaybes $ maybeAscii . ord <$> T.unpack s
+  where
+    maybeAscii :: Int -> Maybe Int8
+    maybeAscii c | c >= 97 && c <= 122 = Just $ fromIntegral $ c - 97
+    maybeAscii _ = Nothing
+
+bitIndex :: Foldable f => f Int8 -> Int32
+bitIndex = foldl step zeroBits 
+    where 
+      step :: Int32 -> Int8 -> Int32
+      step bs n = setBit bs $ bitNum n
+      bitNum :: Int8 -> Int
+      bitNum = fromIntegral
 
 solve :: BoxIdSet -> Checksum
 solve = checksum
@@ -81,63 +108,55 @@ spec =
       it "should have a zero checsum" $ solve [] `shouldBe` 0
     context "the example set" $ do
       let example =
-            map
-              T.pack
-              [ "abcde"
-              , "bababc"
-              , "abbcde"
-              , "abcccd"
-              , "aabcdd"
-              , "abcdee"
-              , "ababab"
-              ]
+              T.words $ pack "abcde bababc abbcde abcccd aabcdd abcdee ababab"
       it "should have a checksum of 12" $ solve example `shouldBe` 12
-    context "checksum calculations" $ do
-      it "calulates [(True,True),(True,True)]" $
-        checksum' [(True, True), (True, True)] `shouldBe` 4
-      it "calulates [(True,True),(False,False)]" $
-        checksum' [(True, True), (False, False)] `shouldBe` 1
-      it "calulates [(True,True),(False,False), (True, False)]" $
-        checksum' [(True, True), (False, False), (True, False)] `shouldBe` 2
-    context "/projection" $ do
-      it "abcdef should be (False, False)" $
-        boxProject (T.pack "abcdef") `shouldBe` (False, False)
-      it "bababc should be (True, True)" $
-        boxProject (T.pack "bababc") `shouldBe` (True, True)
-      it "aabcdd should be (True, False)" $
-        boxProject (T.pack "aabcdd") `shouldBe` (True, False)
-      it "abcccd should be (False, True)" $
-        boxProject (T.pack "abcccd") `shouldBe` (False, True)
-      it "aabcde should be (True, False)" $
-        boxProject (T.pack "aabcde") `shouldBe` (True, False)
-      it "abcdee should be (True, False)" $
-        boxProject (T.pack "abcdee") `shouldBe` (True, False)
-      it "ababab should be (False, True)" $
-        boxProject (T.pack "ababab") `shouldBe` (False, True)
+    context "checksum calculations" $
+      allSamplesShouldBe (getProduct . checksum')
+        [Raw [(True, True), (True, True)] $ 4
+        ,Raw [(True, True), (False, False)] $ 1
+        ,Raw [(True, True), (False, False), (True, False)] $ 2]
+
+    context "/projection" $
+      allSamplesShouldBe boxProject
+        [Raw (pack "abcdef") $ (False, False)
+        ,Raw (pack "bababc") $ (True, True)
+        ,Raw (pack "aabcdd") $ (True, False)
+        ,Raw (pack "abcccd") $ (False, True)
+        ,Raw (pack "aabcde") $ (True, False)
+        ,Raw (pack "abcdee") $ (True, False)
+        ,Raw (pack "ababab") $ (False, True)]
+
+    context "puzzle 2" $
+      context "indices" $
+        allSamplesShouldBe indices
+         [ Raw (pack "abc") $ S.fromList [0,1,2]]
+
     context "the input data" $ do
+      let 
+        puzzle2Example :: [Text]
+        puzzle2Example = [ "abcde", "abcfe"]
+    
+        expectedLength = length expected
+        expected :: [Text]
+        expected =
+          [ "omlvgpokxfnctqyersabjwzizp"
+          , "omlvtdhxxflctqyersabjwziup"
+          , "omlvgdakxfnctqyersabzmziup"
+          , "omlvgdhkxfnchqyersarjwsiup"
+          , "omlvgdnkxfnctqyersabhwziuq"
+          ]
+        expectedTail :: [Text]
+        expectedTail =
+          [ "omlvgdhkxfncaqyersabwwzoup"
+          , "omlvgdhkxfncjqyersanjwfiup"
+          , "omlvgdhkwfnctqyersqbjwziux"
+          , "omrvgdhjxfnctqyeksabjwziup"
+          , "omlvgdhkxfnctpyersaftwziup"
+          ]
       it "should start with" $
-        fmap (Prelude.take expectedLength) parsedInput `shouldBe` Right expected
+        (take expectedLength) <$> parsedInput `shouldBe` Right expected
       it "should end with" $
-        fmap (reverse . Prelude.take expectedLength . reverse) parsedInput `shouldBe`
-        Right expectedTail
+        (reverse . take expectedLength . reverse) <$> parsedInput `shouldBe` Right expectedTail
       it "should have 250 lines" $ fmap length parsedInput `shouldBe` Right 250
-      it "should have a solution 4 with" $
-        fmap solve parsedInput `shouldBe` Right 7105
-  where
-    expectedLength = length expected
-    expected :: [Text]
-    expected =
-      [ "omlvgpokxfnctqyersabjwzizp"
-      , "omlvtdhxxflctqyersabjwziup"
-      , "omlvgdakxfnctqyersabzmziup"
-      , "omlvgdhkxfnchqyersarjwsiup"
-      , "omlvgdnkxfnctqyersabhwziuq"
-      ]
-    expectedTail :: [Text]
-    expectedTail =
-      [ "omlvgdhkxfncaqyersabwwzoup"
-      , "omlvgdhkxfncjqyersanjwfiup"
-      , "omlvgdhkwfnctqyersqbjwziux"
-      , "omrvgdhjxfnctqyeksabjwziup"
-      , "omlvgdhkxfnctpyersaftwziup"
-      ]
+      it "should have a solution 4 with" $ solve <$> parsedInput `shouldBe` Right 7105
+

@@ -52,3 +52,5 @@ tests:
     dependencies:
     - Day1
     - hspec >= 2.2
+    - string-combinators
+
