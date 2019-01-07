@@ -26,6 +26,7 @@ dependencies:
 - attoparsec
 - containers
 - multiset
+- here
 
 library:
   source-dirs: src
