@@ -1,0 +1,6 @@
+{
+    "recommendations": [
+	  "alanz.vscode-hie-server",
+	  "eamodio.gitlens"
+    ]
+}
