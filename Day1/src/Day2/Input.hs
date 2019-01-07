@@ -1,5 +1,5 @@
 {-# LANGUAGE QuasiQuotes, ExtendedDefaultRules #-}
-module Day2Input where
+module Day2.Input where
 
 import Data.Text (Text)   
 import Text.InterpolatedString.Perl6 (q)

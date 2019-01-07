@@ -1,59 +1,8 @@
 {-# LANGUAGE QuasiQuotes, ExtendedDefaultRules #-}
-
-module Puzzle1
-  ( parseInput
-  , puzzleData
-  , solution
-  , solve
-  , solve2
-  , solution2
-  , scanRepeating
-  ) where
-
-import Data.Attoparsec.Text
-import Data.List (find, scanl)
-import qualified Data.Set as S
-import Data.Set (Set)
-import qualified Data.Text as T
-import Data.Text (Text)
+module Day1.Input (puzzleData) where
 import Text.InterpolatedString.Perl6 (q)
-import qualified Data.MultiSet as MS
-import Data.MultiSet (MultiSet)
-import Data.Maybe (listToMaybe, catMaybes)
+import Data.Text (Text)
 
-
-parseInput :: Text -> Either String [Int]
-parseInput = parseOnly (sepBy inputParser endOfLine)
-
-inputParser :: Parser Int
-inputParser = signed decimal
-
-solution :: Text -> Either String Int
-solution = solving solve
-
-solution2 :: Text -> Either String (Maybe Int)
-solution2 = solving solve2
-
-solving :: ([Int] -> a) -> Text -> Either String a
-solving f input = fmap f (parseInput input)
-
-solve :: [Int] -> Int
-solve = sum
-
-solve2 :: [Int] -> Maybe Int
-solve2 xs =
-  listToMaybe $ scanRepeating $ scanFrequencies $ cycle xs
-  where
-    scanFrequencies = scanl (+) 0
-    skipEmpty = find (not . S.null)
-
-scanRepeating :: [Int] -> [Int]
-scanRepeating xs = catMaybes $ fmap fst $ scanl merge (Nothing, S.empty) xs
-  where
-    merge :: (Maybe Int, Set Int) -> Int -> (Maybe Int, Set Int)
-    merge (_, s) a | S.member a s = (Just a, s)
-    merge (_, s) a = (Nothing, S.insert a s)
-    
 puzzleData :: Text
 puzzleData =
   [q|+13

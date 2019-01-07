@@ -1,11 +1,11 @@
 
-module InputSpec (spec) where
+module Day1.InputSpec (spec) where
     
 import SpecHelper
 import qualified Data.Text as T
 import Data.Text (Text)
 import Text.InterpolatedString.Perl6
-import Puzzle1
+import Day1.Puzzle1
 import qualified Data.Set as S
 import Data.Set (Set)
 

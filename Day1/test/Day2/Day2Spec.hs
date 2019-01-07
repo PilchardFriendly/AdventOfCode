@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Day2Spec
+module Day2.Day2Spec
   ( spec
   ) where
 
@@ -19,7 +19,7 @@ import Foreign.Marshal.Utils as FMU
 import Data.Monoid
 import Data.Coerce
 import Data.Foldable as Fold
-import Day2Input
+import Day2.Input
 
 import SpecHelper
 
