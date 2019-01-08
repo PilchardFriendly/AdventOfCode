@@ -4,8 +4,7 @@ module Day3.Day3Spec
     )
 where
 import           Data.Maybe                     ( catMaybes, listToMaybe )
-import           Data.Foldable                     ( find)
-import qualified Data.Foldable                     as Foldable
+import           Data.Foldable                     
 import           Data.Attoparsec.Text          as P
                                          hiding ( take )
 import qualified Data.Attoparsec.Text           ( Parser )
@@ -15,7 +14,7 @@ import           Data.Map                      (Map)
 import           Data.Monoid                   (Sum(..))          
 import           SpecHelper
 
-import qualified Data.Set                      as S
+import qualified Data.Set                      as Set
 import           Data.Set                       ( Set )
 import           Day3.Input                     ( puzzleData3 )
 
@@ -43,9 +42,6 @@ identListP = do
     a <- char '#' *> P.decimal
     return [a]
 
-overlay :: Monoid a => Set (Rect a) -> Set (Rect a)
-overlay = const S.empty
-
 toGrid :: Rect a -> Grid a
 toGrid r@(Rect x y w h a) =  Map.fromList [((xG,yG),a) | xG <- [x .. (x+w)-1], yG <- [y .. (y+h)-1]]
 
@@ -58,7 +54,7 @@ solution l g = getSum $ foldMap l g
 class FiniteLength a where
     finiteLength :: a -> Int
 instance FiniteLength (Set a) where
-    finiteLength = S.size
+    finiteLength = Set.size
 instance FiniteLength [a] where
     finiteLength = length 
             
@@ -75,19 +71,19 @@ solve rs = solution inSolution $ merge $ toGrid <$> rs
 solution2 :: (Foldable t) => (t a -> Bool) -> Grid (t a)-> Maybe a
 solution2 f g = do
     result <- find f g
-    listToMaybe $ Foldable.toList result
+    listToMaybe $ toList result
 
 inSolution2 :: (FiniteLength a) => a -> Bool
 inSolution2 as | finiteLength as == 1 = True
 inSolution2 _ = False
 
 inSolution2b :: Eq a => Grid a -> Grid a -> Bool
-inSolution2b total candidate = candidate `LazyMap.isSubmapOf` total
+inSolution2b = flip LazyMap.isSubmapOf
 
 maybeA :: Foldable t => Map k (t a)-> Maybe a
 maybeA g = do
     ts <- listToMaybe $ Map.elems g
-    listToMaybe $ Foldable.toList ts
+    listToMaybe $ toList ts
 
 solve2 :: (Eq (t a), Monoid (t a), Foldable t, FiniteLength (t a)) => [Rect (t a)] -> Maybe a
 solve2 rs = do
@@ -102,8 +98,8 @@ solve2 rs = do
 spec :: Spec
 spec = describe "Soemthing" $ 
   context "Puzze1" $ do
-    let setOne    = S.singleton 1
-        setTwo    = S.singleton 2
+    let setOne    = Set.singleton 1
+        setTwo    = Set.singleton 2
         setOneTwo = setOne <> setTwo    
     context "solve" $
         allSamplesShouldBe
