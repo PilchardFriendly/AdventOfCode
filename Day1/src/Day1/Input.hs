@@ -1,11 +1,12 @@
-{-# LANGUAGE QuasiQuotes, ExtendedDefaultRules #-}
+{-# LANGUAGE QuasiQuotes, OverloadedStrings #-}
 module Day1.Input (puzzleData) where
-import Text.InterpolatedString.Perl6 (q)
+import Data.String.Here
 import Data.Text (Text)
 
 puzzleData :: Text
 puzzleData =
-  [q|+13
+  [here|
++13
 -12
 -14
 +19
