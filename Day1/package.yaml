@@ -27,6 +27,8 @@ dependencies:
 - containers
 - multiset
 - here
+- time
+- ranges == 0.2.4
 
 library:
   source-dirs: src

@@ -16,7 +16,7 @@ spec  = do
   
   describe "parseInput" $ 
     allSamplesShouldBe parseInput
-      [ Parsed (doubleQuotes "+1\n+2") $ Right [1,2]
+    [ Parsed (doubleQuotes "+1\n+2") $ Right [1,2]
       , Parsed (doubleQuotes "-1\n+2") $ Right [-1, 2]]
 
   describe "solve" $ 

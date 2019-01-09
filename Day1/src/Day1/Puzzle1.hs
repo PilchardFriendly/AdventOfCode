@@ -19,7 +19,7 @@ import Data.Text (Text)
 import Text.InterpolatedString.Perl6 (q)
 import qualified Data.MultiSet as MS
 import Data.MultiSet (MultiSet)
-import Data.Maybe (listToMaybe, catMaybes)
+import Data.Maybe (listToMaybe, catMaybes, mapMaybe)
 
 
 parseInput :: Text -> Either String [Int]
@@ -48,7 +48,7 @@ solve2 xs =
     skipEmpty = find (not . S.null)
 
 scanRepeating :: [Int] -> [Int]
-scanRepeating xs = catMaybes $ fmap fst $ scanl merge (Nothing, S.empty) xs
+scanRepeating xs = mapMaybe fst  (scanl merge (Nothing, S.empty) xs)
   where
     merge :: (Maybe Int, Set Int) -> Int -> (Maybe Int, Set Int)
     merge (_, s) a | S.member a s = (Just a, s)
