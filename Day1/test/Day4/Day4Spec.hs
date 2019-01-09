@@ -6,6 +6,7 @@ module Day4.Day4Spec (
 where
 
 import           Data.Maybe                     ( catMaybes, listToMaybe )
+import           Data.Functor
 import           Data.Foldable                     
 import           Data.Attoparsec.Text          as P
 import           Data.Time                     (LocalTime,LocalTime(..), TimeOfDay(..), fromGregorian)
@@ -50,9 +51,8 @@ wakeEventP :: Parser (WakeEvent Guard)
 wakeEventP =  
   choice 
     [ BeginsShift <$> ("Guard #" *> decimal <* " begins shift")
-    , string "wakes up" *> pure WakesUp
-    , string "falls asleep" *> pure FallsAsleep
-    ]
+    , string "wakes up" $> WakesUp
+    , string "falls asleep" $> FallsAsleep]
 
 parseInput :: Parser [GuardEvent]
 parseInput = sepBy (eventP (skipSpace *> wakeEventP)) endOfLine
@@ -60,6 +60,8 @@ parseInput = sepBy (eventP (skipSpace *> wakeEventP)) endOfLine
 spec :: Spec
 spec = describe "Something" $ do
   let expectedDate = LocalTime (fromGregorian 1518 11 01) ( TimeOfDay 00 00 (MkFixed 00))
+      expectedBegin = BeginsShift 10
+
   context "parsing" $ do
     context "datetime" $ 
       it (show expectedDate) $ parseOnly timestampP "[1518-11-01 00:00]" `shouldBe` Right expectedDate
