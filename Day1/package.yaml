@@ -28,7 +28,11 @@ dependencies:
 - multiset
 - here
 - time
-- ranges == 0.2.4
+- lens
+- lens-datetime
+- range
+- modular-arithmetic
+- dlist
 
 library:
   source-dirs: src

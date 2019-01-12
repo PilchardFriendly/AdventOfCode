@@ -1,6 +1,6 @@
 resolver: lts-13.1
 packages: 
   - Day1
-extra-deps:
-  -  ranges-0.2.4@sha256:c0cb6e877f34fa81d24952e0db77eef1deaec5f7e5a9341b7a0ea3c5ff85ef0d
-  
+allow-newer: true  
+extra-deps:  
+  - modular-arithmetic-1.2.1.4@sha256:3c1d79457f67e6a785c5ae2548133d711ccafd18aee45dfd48870ad28475c185
