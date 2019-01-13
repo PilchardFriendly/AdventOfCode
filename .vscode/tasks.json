@@ -6,7 +6,7 @@
         {
             "label": "Run stack tests",
             "type": "shell",
-            "command": "stack test",
+            "command": "stack test --file-watch",
             "group": {
                 "kind": "test",
                 "isDefault": true
