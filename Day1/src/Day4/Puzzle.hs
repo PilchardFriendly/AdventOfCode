@@ -143,20 +143,33 @@ makeLenses ''Shift
 
 instance Show (Shift [SleepRange])
   where
-    show s = show (At (s ^. shiftStart) (BeginsShift $ s ^. shiftGuard))
-        ++ concat (show <$> mconcat (toWakeEvents <$> (s ^. shiftWhat)))
+    show s = concat $ show <$> (begin s : naps s)
+        -- ++ concat (show <$> mconcat (toWakeEvents <$> (s ^. shiftWhat)))
+        where 
+            begin s= At (view shiftStart s) (BeginsShift $ view shiftGuard s)
+            naps s = mconcat $ toWakeEvents <$> view shiftWhat s
+
 
 instance Ord (Shift [SleepRange])
   where
-    compare a b = (flip compare) (a ^. shiftStart) (b ^. shiftStart)
+    compare = flip compare `on` (view shiftStart)
 
-{- Puzzle -}
-data P4D1 = Puzzle { _P4D1Shifts :: [Shift [SleepRange]]}
+shiftP :: (EventTime -> EventTime -> SleepRange) -> Parser (Shift [SleepRange])
+shiftP mkRange = do
+    start  <- guardP
+    sleeps <- many sleepRangeP
+    return $ Shift (start ^. when) (start ^. what) sleeps
 
-makeLenses ''P4D1
+  where
+    guardP :: Parser (Event Guard)
+    guardP = eventP (" Guard #" *> decimal <* " begins shift" <* endOfLine)
+    sleepRangeP :: Parser SleepRange
+    sleepRangeP =
+        mkRange
+            <$> (view when <$> eventP (string " falls asleep") <* skipSpace)
+            <*> (view when <$> eventP (string " wakes up") <* skipSpace)
 
-p4D1p :: Parser P4D1
-p4D1p = Puzzle . sort <$> parseInput
+
 
 finiteLength :: Num a => Range a -> a
 finiteLength (SpanRange a b) = abs (b - a)
@@ -194,7 +207,10 @@ counts ms = build $ project <$> ms
     build   = Map.fromListWith (+)
 
 minutesForGuard :: Map Guard [SleepRange] -> Guard -> Map Min60 Int
-minutesForGuard base g = counts $ foldMap asleepMinutes $ base ! g
+minutesForGuard base g = minutesForGuard' $ base ! g
+
+minutesForGuard' :: [SleepRange] -> Map Min60 Int
+minutesForGuard' ss = counts $ foldMap asleepMinutes $ ss
 
 toSolvable :: [Shift [SleepRange]] -> Map Guard [SleepRange]
 toSolvable ss = build $ project <$> ss
@@ -217,6 +233,29 @@ solution ss =
     findSleepiestMinute g = findMaxValue $ minutesForGuard base g
     base = toSolvable ss
 
+data Result2 = Result2 {
+    _r2guard :: Guard, 
+    _r2Count :: Int }
+  deriving (Eq, Show)
+makeLenses ''Result2
+
+instance Ord Result2 where
+    compare = compare `on` (view r2Count)
+
+-- Map Min60 -> (Guard, Int)
+solution2 :: [Shift [SleepRange]] -> Int
+solution2 ss = 0
+  where
+    base = toSolvable ss
+    findThing :: (Min60, Result2)
+    findThing = maximum (toThing <$> those)
+    toThing (g, m60, c) = (m60, Result2 g c)
+    those :: [(Guard, Min60, Int)]
+    those = do 
+        (g, min60_2_c) <- Map.assocs $ Map.map minutesForGuard' base
+        (min60, c) <- Map.assocs min60_2_c
+        return (g, min60, c)
+        
 
 -- Parsing
 
@@ -238,22 +277,6 @@ shiftStream mkRange es = go es []
     update t1 t2 = over shiftWhat (sort . cons (mkRange t1 t2))
 
 
-shiftP :: (EventTime -> EventTime -> SleepRange) -> Parser (Shift [SleepRange])
-shiftP mkRange = do
-    start  <- guardP
-    sleeps <- many sleepRangeP
-    return $ Shift (start ^. when) (start ^. what) sleeps
-
-  where
-    guardP :: Parser (Event Guard)
-    guardP = eventP (" Guard #" *> decimal <* " begins shift" <* endOfLine)
-    sleepRangeP :: Parser SleepRange
-    sleepRangeP =
-        mkRange
-            <$> (view when <$> eventP (string " falls asleep") <* skipSpace)
-            <*> (view when <$> eventP (string " wakes up") <* skipSpace)
-
-
 parseInput :: Parser [Shift [SleepRange]]
 parseInput = many (shiftP mkSleep)
 
@@ -264,3 +287,11 @@ parseInputB = shiftStream mkSleep . sort <$> many (eventP wakeEventP)
 
 parseLine :: Parser GuardEvent
 parseLine = eventP (skipSpace *> wakeEventP) <* (endOfLine <|> endOfInput)
+
+{- Puzzle -}
+data P4D1 = Puzzle { _P4D1Shifts :: [Shift [SleepRange]]}
+
+makeLenses ''P4D1
+
+p4D1p :: Parser P4D1
+p4D1p = Puzzle . sort <$> parseInput
