@@ -31,7 +31,6 @@ dependencies:
 - lens-datetime
 - range
 - modular-arithmetic
-- dlist
 - safe
 
 library:
@@ -45,6 +44,8 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -fwarn-unused-binds 
+    - -fwarn-unused-imports
     dependencies:
     - Day1
 
@@ -56,6 +57,8 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -fwarn-unused-binds 
+    - -fwarn-unused-imports
     dependencies:
     - Day1
     - hspec >= 2.2

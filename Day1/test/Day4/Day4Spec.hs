@@ -10,18 +10,13 @@ where
 
 import           Control.Applicative
 import           Control.Lens
-import           Control.Exception
 
-import           Data.Map                      (Map, (!))
 import qualified Data.Map                      as Map
 import           Data.Modular
-import           Data.Monoid
-import           Data.Attoparsec.Text          as P
-import           Data.List                     (sortBy, sort)
-import           Data.Time                    
+import           Data.Attoparsec.Text          
 import           Data.Time.Lens
 import           Data.Range.Range
-import  Day4.Input (puzzleData)
+import           Day4.Input (puzzleData)
 
 import Data.String.Here (here)
 import qualified Data.Text as T
@@ -34,7 +29,6 @@ spec :: Spec
 spec = describe "Something" $ do
   let 
     expectedDate = baseDate
-    expectedBegin = BeginsShift 10
     mkRange :: (FlexDateTime -> FlexDateTime) -> (FlexDateTime -> FlexDateTime) -> SleepRange
     mkRange start end = SleepRange $ SpanRange (baseOffset $ baseDate & flexDT %~ start) (baseOffset $ baseDate & flexDT %~ end)
     mkDate f = baseDate & flexDT %~ f
