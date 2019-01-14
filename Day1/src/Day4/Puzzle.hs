@@ -6,6 +6,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Day4.Puzzle where
 
@@ -23,15 +24,18 @@ import           Data.Function                  ( on )
 import           Data.Foldable                  ( foldl
                                                 , maximumBy
                                                 )
+import           Safe.Foldable                                                
 import           Data.Map                       ( Map
                                                 , (!)
                                                 )
 import qualified Data.Map                      as Map
 import           Data.Modular
 import           Data.Monoid
+import           Data.Ord                       (comparing)
 import           Data.Attoparsec.Text          as P
 import           Data.List                      ( sortBy
                                                 , sort
+                                                , sortOn
                                                 )
 import           Data.Time
 import           Data.Time.Clock                ( secondsToDiffTime
@@ -120,7 +124,7 @@ instance (Ord SleepRange)
 toWakeEvents :: SleepRange -> [Event (WakeEvent Guard)]
 toWakeEvents (SleepRange (SpanRange a b)) =
     [At (addUTCTime a baseDate) FallsAsleep, At (addUTCTime b baseDate) WakesUp]
-toWakeEvents _ = []   
+toWakeEvents _ = []
 
 {- Time Functions -}
 
@@ -144,10 +148,15 @@ makeLenses ''Shift
 instance Show (Shift [SleepRange])
   where
     show s = concat $ show <$> (begin s : naps s)
-        -- ++ concat (show <$> mconcat (toWakeEvents <$> (s ^. shiftWhat)))
-        where 
-            begin s= At (view shiftStart s) (BeginsShift $ view shiftGuard s)
-            naps s = mconcat $ toWakeEvents <$> view shiftWhat s
+-- ++ concat (show <$> mconcat (toWakeEvents <$> (s ^. shiftWhat)))
+
+
+
+
+
+      where
+        begin s = At (view shiftStart s) (BeginsShift $ view shiftGuard s)
+        naps s = mconcat $ toWakeEvents <$> view shiftWhat s
 
 
 instance Ord (Shift [SleepRange])
@@ -210,19 +219,29 @@ minutesForGuard :: Map Guard [SleepRange] -> Guard -> Map Min60 Int
 minutesForGuard base g = minutesForGuard' $ base ! g
 
 minutesForGuard' :: [SleepRange] -> Map Min60 Int
-minutesForGuard' ss = counts $ foldMap asleepMinutes $ ss
+minutesForGuard' ss = counts $ foldMap asleepMinutes ss
 
-toSolvable :: [Shift [SleepRange]] -> Map Guard [SleepRange]
-toSolvable ss = build $ project <$> ss
+type Solveable = Map Guard [SleepRange]
+toSolveable :: [Shift [SleepRange]] -> Solveable
+toSolveable ss = build $ project <$> ss
   where
     project s@(Shift at g rs) = (g, rs)
     build = Map.fromListWith (++)
 
 sndOrdering :: Ord b => (a, b) -> (a, b) -> Ordering
-sndOrdering = compare `on` snd
+sndOrdering = orderingOn snd
+
+orderingOn :: Ord b => (a -> b) -> (a -> a -> Ordering)
+orderingOn = on compare
 
 findMaxValue :: Ord b => Map a b -> a
-findMaxValue m = fst . maximumBy sndOrdering $ Map.toList m
+findMaxValue m = fst . maximumBy (orderingOn snd) $ Map.toList m
+
+maybeMaximumBy :: (a -> a -> Ordering) -> [a] -> Maybe a
+maybeMaximumBy f = go
+  where 
+    go [] = Nothing
+    go xs = Just $ maximumBy f xs
 
 solution :: [Shift [SleepRange]] -> Int
 solution ss =
@@ -231,32 +250,68 @@ solution ss =
   where
     findSleepiestGuard = findMaxValue $ asleepFor <$> base
     findSleepiestMinute g = findMaxValue $ minutesForGuard base g
-    base = toSolvable ss
+    base = toSolveable ss
 
 data Result2 = Result2 {
-    _r2guard :: Guard, 
+    _r2guard :: Guard,
     _r2Count :: Int }
   deriving (Eq, Show)
 makeLenses ''Result2
 
 instance Ord Result2 where
-    compare = compare `on` (view r2Count)
+    compare = orderingOn (view r2Count)
 
 -- Map Min60 -> (Guard, Int)
-solution2 :: [Shift [SleepRange]] -> Int
-solution2 ss = 0
+solution2 :: [Shift [SleepRange]] -> (Min60, Guard)
+solution2 ss = result findThing
   where
-    base = toSolvable ss
+    base = toSolveable ss
+    result :: (Min60,Result2) -> (Min60, Guard)
+    result (m,r2) = (m, (r2 ^. r2guard))
     findThing :: (Min60, Result2)
-    findThing = maximum (toThing <$> those)
-    toThing (g, m60, c) = (m60, Result2 g c)
-    those :: [(Guard, Min60, Int)]
-    those = do 
-        (g, min60_2_c) <- Map.assocs $ Map.map minutesForGuard' base
-        (min60, c) <- Map.assocs min60_2_c
-        return (g, min60, c)
-        
+    findThing = maximum (toScore <$> guardScores base)
+    toScore (g, (m60, c)) = (m60, Result2 g c)
 
+    -- minuteScores :: Solveable -> [(Min60, [(Guard, Int)])]
+    -- minuteScores sol = Map.assocs $ Map.mapMaybe
+
+    guardScores :: Solveable -> [(Guard, (Min60, Int))]
+    guardScores sol = Map.assocs $ Map.mapMaybe guardScore sol
+    guardScore :: [SleepRange] -> Maybe (Min60,Int)
+    guardScore !x = maybeScore $ score x
+        where 
+            score x = minutesForGuard' x
+            maybeScore scores = maybeMaximumBy (orderingOn snd) $ Map.toList $ scores
+
+solution2b :: [Shift [SleepRange]] -> Maybe (Min60, Guard)
+solution2b ss = (id *** fst) <$> (solution2b' 
+              $ foldMap go
+              $ Map.toList 
+              $ minutesForGuard' <$> toSolveable ss)
+    where 
+        go :: (a, Map b c) -> [(a, (b, c))]
+        go (a, bc)=  (a,) <$> Map.toList bc
+            
+solution2b' :: [(Guard, (Min60, Int))] -> Maybe (Min60, (Guard, Int))
+solution2b'  as = maximumByMay (comparing (snd . snd))
+               $ Map.toList 
+               $ Map.mapMaybe scoreMinute 
+               $ Map.fromListWith mappend 
+               $ (twizzle <$> as)
+  where
+    twizzle :: (a, (b, c)) -> (b, [(a, c)])
+    twizzle (k, (v1, v2))  = (v1, [(k, v2)])
+    scoreMinute :: [(Guard, Int)] -> Maybe (Guard, Int)
+    scoreMinute = uniqueHead snd <$> sortOn (negate.snd)
+
+    uniqueHead :: (Show a, Eq b) => (a -> b) -> [a] -> Maybe a
+    uniqueHead f = go
+        where
+            go (a:b:_)
+                | (f a) == (f b) = Nothing
+                | otherwise = Just a
+            go [a] = Just a
+            go _ = Nothing
 -- Parsing
 
 

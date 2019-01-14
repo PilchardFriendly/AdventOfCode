@@ -10,6 +10,7 @@ where
 
 import           Control.Applicative
 import           Control.Lens
+import           Control.Exception
 
 import           Data.Map                      (Map, (!))
 import qualified Data.Map                      as Map
@@ -56,7 +57,7 @@ spec = describe "Something" $ do
       let simpleShifts = [Shift baseDate 10 [mkRange (minutes +~5) (minutes +~25) , mkRange (minutes +~5) (minutes +~6)]]
       it "should have have solution of 5" $ solution simpleShifts `shouldBe` 50
       context "minutesForGuard" $ 
-        allSamplesShouldBe (\(a,c,b) -> Map.lookup b $ minutesForGuard (toSolvable a) c)
+        allSamplesShouldBe (\(a,c,b) -> Map.lookup b $ minutesForGuard (toSolveable a) c)
           [Raw (simpleShifts, 10, 5) (Just 2)
           ,Raw (simpleShifts, 10, 1) Nothing]
 
@@ -64,9 +65,13 @@ spec = describe "Something" $ do
       allSamplesShouldBe finiteLength 
         [ Raw (SingletonRange 10) 0
         , Raw (SpanRange 10 20) 10]
-    context "actual puzzle" $
+    context "actual puzzle" $ do
       it "should ahve a solution (FOR REAL)" $
          solution <$> parseOnly parseInputB puzzleData `shouldBe` Right 125444
+      -- it "should have a solution 2 (errorCall" $
+      --    evaluate (solution2 <$> parseOnly parseInputB puzzleData) `shouldThrow` anyErrorCall
+      it "should have a solution 2" $
+         solution2b <$> parseOnly parseInputB puzzleData `shouldBe` Right (Just (25 :: Int/60, 733))
 
       
 
@@ -133,5 +138,9 @@ spec = describe "Something" $ do
         parsedBExample `shouldBe` parsedExample
       it "should have solution" $
         solution <$> parsedExample `shouldBe` Right 240
-      it "should have solution (B)" $
+      it "should have solution (parseB)" $
         solution <$> parsedBExample `shouldBe` solution <$> parsedExample
+      it "should have solution 2 (parseB)" $
+        solution2 <$> parsedBExample `shouldBe` Right (45 :: Int/60, 99)
+      it "should have solution 2b (parseB)" $
+        solution2b <$> parsedBExample `shouldBe` Right (Just (45 :: Int/60, 99))

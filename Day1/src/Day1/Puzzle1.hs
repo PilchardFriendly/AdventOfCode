@@ -1,5 +1,4 @@
-{-# LANGUAGE QuasiQuotes, ExtendedDefaultRules #-}
-
+{-# LANGUAGE QuasiQuotes, OverloadedStrings, ExtendedDefaultRules #-}
 module Day1.Puzzle1
   ( parseInput
   , puzzleData
@@ -16,7 +15,7 @@ import qualified Data.Set as S
 import Data.Set (Set)
 import qualified Data.Text as T
 import Data.Text (Text)
-import Text.InterpolatedString.Perl6 (q)
+import Data.String.Here
 import qualified Data.MultiSet as MS
 import Data.MultiSet (MultiSet)
 import Data.Maybe (listToMaybe, catMaybes, mapMaybe)
@@ -56,7 +55,8 @@ scanRepeating xs = mapMaybe fst  (scanl merge (Nothing, S.empty) xs)
     
 puzzleData :: Text
 puzzleData =
-  [q|+13
+  [here|
++13
 -12
 -14
 +19

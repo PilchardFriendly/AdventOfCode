@@ -7,6 +7,7 @@
             "label": "Run stack tests",
             "type": "shell",
             "command": "stack test --file-watch",
+            // "command": "stack test --trace --profile --file-watch",
             "group": {
                 "kind": "test",
                 "isDefault": true

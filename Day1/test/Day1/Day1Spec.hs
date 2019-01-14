@@ -4,7 +4,6 @@ module Day1.Day1Spec (spec) where
 import SpecHelper
 import qualified Data.Text as T
 import Data.Text (Text, pack)
-import Text.InterpolatedString.Perl6
 import Day1.Puzzle1
 import qualified Data.Set as S
 import Data.Set (Set)
