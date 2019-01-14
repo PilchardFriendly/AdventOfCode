@@ -1,0 +1,6 @@
+- functions: 
+  - {name: trace, within: []} 
+  - {name: traceShow, within: []} 
+  - {name: traceShowId, within: []}
+
+  - {name: unsafePerformIO, within: []}

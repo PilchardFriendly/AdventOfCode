@@ -1,3 +1,4 @@
+{- HLINT ignore "Unused LANGUAGE pragma" -} 
 {-# LANGUAGE QuasiQuotes, OverloadedStrings #-}
 module Day1.Input (puzzleData) where
 import Data.String.Here

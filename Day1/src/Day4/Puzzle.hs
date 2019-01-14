@@ -1,12 +1,12 @@
+{- HLINT ignore "Unused LANGUAGE pragma" -} 
+
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE BangPatterns #-}
 
 module Day4.Puzzle where
 
@@ -76,7 +76,7 @@ wakeEventP = skipSpace *> choice
 
 instance Show a => Show (WakeEvent a)
   where
-    show (BeginsShift a) = "Guard #" ++ (show a) ++ " begins shift"
+    show (BeginsShift a) = "Guard #" ++ show a ++ " begins shift"
     show WakesUp         = "wakes up"
     show FallsAsleep     = "falls asleep"
 
@@ -106,7 +106,7 @@ eventP aP = At <$> timestampP <*> aP <* skipSpace
 type GuardEvent = Event (WakeEvent Guard)
 
 {- SleepRange -}
-data SleepRange = SleepRange { _range :: Range NominalDiffTime }
+newtype SleepRange = SleepRange { _range :: Range NominalDiffTime }
   deriving (Eq, Show)
 
 makeLenses ''SleepRange
@@ -222,8 +222,8 @@ findMaxValue = fst . maximumBy (comparing snd) . Map.toList
 
 solution :: [Shift [SleepRange]] -> Int
 solution ss =
-    (fromInteger findSleepiestGuard)
-        * (unMod $ findSleepiestMinute findSleepiestGuard)
+    fromInteger findSleepiestGuard
+        * unMod (findSleepiestMinute findSleepiestGuard)
   where
     findSleepiestGuard = findMaxValue $ asleepFor <$> base
     findSleepiestMinute = findMaxValue . minutesForGuard base
@@ -240,9 +240,8 @@ instance Ord Result2 where
 
 solution2b :: [Shift [SleepRange]] -> Maybe (Min60, Guard)
 solution2b ss =
-    second fst <$> 
-      (   solution2b'
-      $   foldMap go
+    second fst <$> solution2b'
+      (   foldMap go
       $   Map.toList
       $   minutesForGuard'
       <$> toSolveable ss

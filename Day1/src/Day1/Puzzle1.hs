@@ -1,4 +1,5 @@
 {-# LANGUAGE QuasiQuotes, OverloadedStrings, ExtendedDefaultRules #-}
+{- HLINT ignore "Unused LANGUAGE pragma" -} 
 module Day1.Puzzle1
   ( parseInput
   , puzzleData

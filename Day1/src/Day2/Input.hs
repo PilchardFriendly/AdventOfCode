@@ -1,3 +1,4 @@
+{- HLINT ignore "Unused LANGUAGE pragma" -} 
 {-# LANGUAGE QuasiQuotes, OverloadedStrings #-}
 module Day2.Input where
 
