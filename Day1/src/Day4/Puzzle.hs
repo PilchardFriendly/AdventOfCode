@@ -228,14 +228,8 @@ toSolveable ss = build $ project <$> ss
     project s@(Shift at g rs) = (g, rs)
     build = Map.fromListWith (++)
 
-sndOrdering :: Ord b => (a, b) -> (a, b) -> Ordering
-sndOrdering = orderingOn snd
-
-orderingOn :: Ord b => (a -> b) -> (a -> a -> Ordering)
-orderingOn = on compare
-
 findMaxValue :: Ord b => Map a b -> a
-findMaxValue m = fst . maximumBy (orderingOn snd) $ Map.toList m
+findMaxValue m = fst . maximumBy (comparing snd) $ Map.toList m
 
 maybeMaximumBy :: (a -> a -> Ordering) -> [a] -> Maybe a
 maybeMaximumBy f = go
@@ -259,29 +253,7 @@ data Result2 = Result2 {
 makeLenses ''Result2
 
 instance Ord Result2 where
-    compare = orderingOn (view r2Count)
-
--- Map Min60 -> (Guard, Int)
-solution2 :: [Shift [SleepRange]] -> (Min60, Guard)
-solution2 ss = result findThing
-  where
-    base = toSolveable ss
-    result :: (Min60,Result2) -> (Min60, Guard)
-    result (m,r2) = (m, (r2 ^. r2guard))
-    findThing :: (Min60, Result2)
-    findThing = maximum (toScore <$> guardScores base)
-    toScore (g, (m60, c)) = (m60, Result2 g c)
-
-    -- minuteScores :: Solveable -> [(Min60, [(Guard, Int)])]
-    -- minuteScores sol = Map.assocs $ Map.mapMaybe
-
-    guardScores :: Solveable -> [(Guard, (Min60, Int))]
-    guardScores sol = Map.assocs $ Map.mapMaybe guardScore sol
-    guardScore :: [SleepRange] -> Maybe (Min60,Int)
-    guardScore !x = maybeScore $ score x
-        where 
-            score x = minutesForGuard' x
-            maybeScore scores = maybeMaximumBy (orderingOn snd) $ Map.toList $ scores
+    compare = comparing (view r2Count)
 
 solution2b :: [Shift [SleepRange]] -> Maybe (Min60, Guard)
 solution2b ss = (id *** fst) <$> (solution2b' 

@@ -140,7 +140,5 @@ spec = describe "Something" $ do
         solution <$> parsedExample `shouldBe` Right 240
       it "should have solution (parseB)" $
         solution <$> parsedBExample `shouldBe` solution <$> parsedExample
-      it "should have solution 2 (parseB)" $
-        solution2 <$> parsedBExample `shouldBe` Right (45 :: Int/60, 99)
       it "should have solution 2b (parseB)" $
         solution2b <$> parsedBExample `shouldBe` Right (Just (45 :: Int/60, 99))
