@@ -19,7 +19,7 @@ spec = do
   describe "solve" $ allSamplesShouldBe solve [Raw [1, 2, 3] 6, Raw [1, 2] 3]
 
   describe "scanRepeating"
-    $ allSamplesShouldBe scanRepeating [Raw [1, 2, 3, 1] [1]]
+    $ allSamplesShouldBe scanRepeating [Raw [1, 2, 3, 1] (Just 1)]
 
   describe "solving 2" $ allSamplesShouldBe
     solve2
