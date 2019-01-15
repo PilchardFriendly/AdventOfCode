@@ -12,11 +12,13 @@ where
 import           Data.Char                      ( toUpper
                                                 , toLower
                                                 )
+import           Day5.Input (puzzleData)
 import           SpecHelper
 
-alchemy :: String -> String
-alchemy = reverse . foldl react ""
+alchemyYo :: (String -> a) -> String -> a
+alchemyYo f = f . foldl react ""
 
+alchemy = alchemyYo reverse
 react :: String -> Char -> String
 react rest ch = go (ch:rest)
   where
@@ -33,7 +35,7 @@ willReact c1 c2 = go c1 c2 || go c2 c1
 spec :: Spec
 spec = describe "Day 5" $ do
   context "alchemy" $ allSamplesShouldBe
-    alchemy
+    (alchemy)
     [Raw "aA" "", Raw "abBA" "", Raw "abAB" "abAB", Raw "aabAAB" "aabAAB"]
   context "react" $ allSamplesShouldBe
     (uncurry react)
@@ -45,4 +47,6 @@ spec = describe "Day 5" $ do
     ,Raw ('A', 'a') True 
     ,Raw ('a', 'a') False
     ,Raw ('a', 'B') False]
+  context "real data" $ do
+    it "should react to form answer" $ alchemyYo length puzzleData `shouldBe` 9900
 
