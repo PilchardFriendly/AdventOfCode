@@ -8,29 +8,32 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Day4.Puzzle where
 
+
 import           Control.Applicative
 import           Control.Arrow
-import           Control.Lens
-import           Control.Lens.TH
+import           Control.Lens            hiding ( ifoldr )
+import           Control.Lens.TH                ( makeLenses )
+
 
 import           Data.Functor
 import           Data.Function                  ( on )
-import           Data.Foldable                  ( foldl
-                                                , maximumBy
-                                                )
+import           Data.Foldable                  ( maximumBy )
+import           Data.Monoid                    ( Sum )
 import           Data.Map                       ( Map
                                                 , (!)
                                                 )
 import qualified Data.Map                      as Map
 import           Data.Modular
-import           Data.Monoid
 import           Data.Ord                       ( comparing )
 import           Data.Attoparsec.Text          as P
-import           Data.List                      ( sortBy
-                                                , sort
+import           Data.List                      ( sort
                                                 , sortOn
                                                 )
 import           Data.Time
@@ -40,13 +43,23 @@ import           Data.Time.Clock                ( secondsToDiffTime
                                                 )
 import           Data.Time.Lens
 import           Data.Fixed
+
 import           Data.Range.Range
 
 import           Data.String.Here               ( here )
 import qualified Data.Text                     as T
 import           Data.Text                      ( pack )
 
+import           Data.Vector.Sized              ( Vector
+                                                , ifoldr
+                                                )
+import           Data.Finite                    ( Finite
+                                                , getFinite
+                                                )
 import           Safe.Foldable
+import           Day4.SleepRange
+import           Day4.Time
+import           Day4.Minutes
 
 
 type EventTime = UTCTime
@@ -82,7 +95,7 @@ instance Show a => Show (WakeEvent a)
   show FallsAsleep     = "falls asleep"
 
 {- Event -}
-data Event a = At { _when::EventTime, _what :: a }
+data Event a = At { _eventWhen::EventTime, _what :: a }
   deriving (Eq)
 
 makeLenses ''Event
@@ -98,7 +111,7 @@ instance Show a => Show (Event a)
 
 instance (Eq a) => Ord (Event a)
   where
-  compare = compare `on` view when
+  compare = compare `on` view eventWhen
 
 eventP :: Parser a -> Parser (Event a)
 eventP aP = At <$> timestampP <*> aP <* skipSpace
@@ -106,31 +119,12 @@ eventP aP = At <$> timestampP <*> aP <* skipSpace
 
 type GuardEvent = Event (WakeEvent Guard)
 
-{- SleepRange -}
-newtype SleepRange = SleepRange { _range :: Range NominalDiffTime }
-  deriving (Eq, Show)
-
-makeLenses ''SleepRange
-
-instance (Ord SleepRange)
-  where
-  compare a b | a == b = EQ
-  compare (SleepRange (SpanRange a b)) (SleepRange (SpanRange c d)) =
-    mappend (compare a c) (compare d b)
-  compare _ _ = EQ
 
 toWakeEvents :: SleepRange -> [Event (WakeEvent Guard)]
 toWakeEvents (SleepRange (SpanRange a b)) =
   [At (addUTCTime a baseDate) FallsAsleep, At (addUTCTime b baseDate) WakesUp]
 toWakeEvents _ = []
 
-{- Time Functions -}
-
-baseDate :: UTCTime
-baseDate = UTCTime (fromGregorian 1518 11 01) 0
-baseOffset = flip diffUTCTime baseDate
-
-type Min60 = Int / 60
 
 {- Shift -}
 data Shift a = Shift { _shiftStart :: UTCTime
@@ -155,7 +149,7 @@ shiftP :: (EventTime -> EventTime -> SleepRange) -> Parser (Shift [SleepRange])
 shiftP mkRange = do
   start  <- guardP
   sleeps <- many sleepRangeP
-  return $ Shift (start ^. when) (start ^. what) sleeps
+  return $ Shift (start ^. eventWhen) (start ^. what) sleeps
 
  where
   guardP :: Parser (Event Guard)
@@ -163,76 +157,50 @@ shiftP mkRange = do
   sleepRangeP :: Parser SleepRange
   sleepRangeP =
     mkRange
-      <$> (view when <$> eventP (string " falls asleep") <* skipSpace)
-      <*> (view when <$> eventP (string " wakes up") <* skipSpace)
+      <$> (view eventWhen <$> eventP (string " falls asleep") <* skipSpace)
+      <*> (view eventWhen <$> eventP (string " wakes up") <* skipSpace)
 
 
 
-finiteLength :: Num a => Range a -> a
-finiteLength (SpanRange a b) = abs (b - a)
-finiteLength _               = 0
 
 
 -- Puzzle 1
 
-
-mkTimeRange :: UTCTime -> UTCTime -> Range NominalDiffTime
-mkTimeRange = SpanRange `on` baseOffset
-
-mkSleep :: UTCTime -> UTCTime -> SleepRange
-mkSleep = (SleepRange .) . mkTimeRange
+type GuardSleep = Vector 60 Integer
 
 
-toMinutes :: NominalDiffTime -> Int
-toMinutes t = floor $ toRational t / 60
-
-asleepFor :: [SleepRange] -> Int
-asleepFor sleep = sum $ pred . toMinutes . finiteLength . _range <$> sleep
-
-
-asleepMinutes :: SleepRange -> [Min60]
-asleepMinutes (SleepRange (SpanRange a b)) =
-  toMod <$> fromRanges [SpanRange (toMinutes a) (toMinutes b - 1)]
-asleepMinutes _ = []
-
-counts :: (Ord a) => [a] -> Map a Int
+counts :: (Num b, Ord a) => [a] -> Map a b
 counts ms = build $ project <$> ms
  where
   project = (, 1)
   build   = Map.fromListWith (+)
 
-minutesForGuard :: Map Guard [SleepRange] -> Guard -> Map Min60 Int
+minutesForGuard :: Map Guard GuardSleep -> Guard -> Map Min60 Integer
 minutesForGuard = (minutesForGuard' .) . (!)
 
-minutesForGuard' :: [SleepRange] -> Map Min60 Int
-minutesForGuard' = counts . foldMap asleepMinutes
+minutesForGuard' :: GuardSleep -> Map Min60 Integer
+minutesForGuard' = ifoldr go Map.empty
+ where
+  go :: Finite 60 -> b -> Map Min60 b -> Map Min60 b
+  go n = Map.insert (toMod $ getFinite n)
 
-type Solveable = Map Guard [SleepRange]
+type Solveable = Map Guard GuardSleep
 toSolveable :: [Shift [SleepRange]] -> Solveable
 toSolveable ss = build $ project <$> ss
  where
   project = view shiftGuard &&& view shiftWhat
-  build   = Map.fromListWith (++)
+  build   = Map.map minuteCount . Map.fromListWith (++)
 
 findMaxValue :: Ord b => Map a b -> a
 findMaxValue = fst . maximumBy (comparing snd) . Map.toList
 
-solution :: [Shift [SleepRange]] -> Int
+solution :: [Shift [SleepRange]] -> Integer
 solution ss = fromInteger findSleepiestGuard
   * unMod (findSleepiestMinute findSleepiestGuard)
  where
-  findSleepiestGuard  = findMaxValue $ asleepFor <$> base
+  findSleepiestGuard  = findMaxValue $ sum <$> base
   findSleepiestMinute = findMaxValue . minutesForGuard base
   base                = toSolveable ss
-
-data Result2 = Result2 {
-    _r2guard :: Guard,
-    _r2Count :: Int }
-  deriving (Eq, Show)
-makeLenses ''Result2
-
-instance Ord Result2 where
-  compare = comparing (view r2Count)
 
 solution2b :: [Shift [SleepRange]] -> Maybe (Min60, Guard)
 solution2b ss = second fst <$> solution2b'
@@ -241,7 +209,8 @@ solution2b ss = second fst <$> solution2b'
   go :: (a, Map b c) -> [(a, (b, c))]
   go (a, bc) = (a, ) <$> Map.toList bc
 
-solution2b' :: [(Guard, (Min60, Int))] -> Maybe (Min60, (Guard, Int))
+solution2b'
+  :: (Ord b, Num b) => [(Guard, (Min60, b))] -> Maybe (Min60, (Guard, b))
 solution2b' as =
   maximumByMay (comparing (snd . snd))
     $ Map.toList
@@ -250,10 +219,10 @@ solution2b' as =
  where
   twizzle :: (a, (b, c)) -> (b, [(a, c)])
   twizzle (k, (v1, v2)) = (v1, [(k, v2)])
-  scoreMinute :: [(Guard, Int)] -> Maybe (Guard, Int)
+  scoreMinute :: (Num b, Eq b, Ord b) => [(Guard, b)] -> Maybe (Guard, b)
   scoreMinute = uniqueHead snd <$> sortOn (negate . snd)
 
-  uniqueHead :: (Show a, Eq b) => (a -> b) -> [a] -> Maybe a
+  uniqueHead :: (Eq b) => (a -> b) -> [a] -> Maybe a
   uniqueHead f = go
    where
     go (a : b : _) | f a == f b = Nothing
@@ -296,3 +265,8 @@ makeLenses ''P4D1
 
 p4D1p :: Parser P4D1
 p4D1p = Puzzle . sort <$> parseInput
+
+
+
+
+

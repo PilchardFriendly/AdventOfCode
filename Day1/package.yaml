@@ -32,6 +32,9 @@ dependencies:
 - range
 - modular-arithmetic
 - safe
+- vector-sized
+- primitive
+- finite-typelits
 
 library:
   source-dirs: src
