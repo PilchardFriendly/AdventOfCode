@@ -13,6 +13,8 @@ import qualified Data.Set                      as S
 import           Data.Char                      ( toUpper
                                                 , toLower
                                                 )
+import           Data.Ord                                                
+import           Data.List (minimumBy)
 import           Day5.Input                     ( puzzleData )
 import           SpecHelper
 
@@ -35,6 +37,18 @@ willReact c1 c2 = go c1 c2 || go c2 c1
 removeUnit :: String -> String -> String
 removeUnit = filter . mem where mem = flip S.notMember . S.fromList
 
+reactiveElements = ['a' .. 'z']
+reactionClass :: Char -> String
+reactionClass c = toUpper c : toLower c : []
+
+mostReactiveElement :: String -> Int
+mostReactiveElement molecule = minimum $ score <$> reactiveElements
+  where
+    score :: Char -> Int
+    score c = (alchemyYo length) $ candidate c
+    candidate = flip removeUnit molecule . reactionClass
+
+    
 spec :: Spec
 spec = describe "Day 5" $ do
   context "alchemy" $ allSamplesShouldBe
@@ -54,8 +68,12 @@ spec = describe "Day 5" $ do
     (alchemy . flip removeUnit "dabAcCaCBAcCcaDA")
     [Raw "Aa" "dbCBcD", Raw "Bb" "daCAcaDA", Raw "Cc" "daDA", Raw "Dd" "abCBAc"]
 
-  context "real data"
-    $          it "should react to form 9900 length answer"
-    $          alchemyYo length puzzleData
-    `shouldBe` 9900
+  context "puzzle 2" $ allSamplesShouldBe
+    (mostReactiveElement)
+    [Raw "dabAcCaCBAcCcaDA" 4]
+  
+
+  context "real data"$ do
+    it "should react to form 9900 length answer" $ alchemyYo length puzzleData `shouldBe` 9900
+    it "should find most reactive" $ mostReactiveElement puzzleData `shouldBe` 4992
 
