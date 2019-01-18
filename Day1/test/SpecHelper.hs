@@ -1,9 +1,10 @@
 {-# LANGUAGE GADTs #-}
 module SpecHelper 
-    ( module Test.Hspec,
-      shouldAllBe,
-      Sample(Raw, Annotated, Parsed, Summarised),
-      allSamplesShouldBe
+    ( module Test.Hspec
+      ,shouldAllBe
+      ,Sample(Raw, Annotated, Parsed, Summarised)
+      ,allSamplesShouldBe
+      ,module Data.String.Here
     ) where
 
 import Test.Hspec
@@ -11,6 +12,7 @@ import Data.String (IsString)
 import Prelude hiding(read)
 import qualified Text.Read as TR
 import Data.String.Combinators
+import Data.String.Here
   
 shouldAllBe :: (IsString a, Show a, Eq b, Show b)
           => (a -> b)

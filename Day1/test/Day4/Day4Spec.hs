@@ -1,11 +1,12 @@
+-- For [here|...]
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+
+-- For modular arithmetic
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE DataKinds #-}
 
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-
+-- For (,1) partial application
 {-# LANGUAGE TupleSections #-}
 
 module Day4.Day4Spec (
@@ -16,28 +17,21 @@ where
 import           Control.Applicative
 import           Control.Lens
 
+import           Data.Finite (finite)
 import qualified Data.Map                      as Map
-import           Data.Modular
-import           Data.Attoparsec.Text          
+        
 import           Data.Time.Lens
-import           Data.Range.Range
-import           Data.Finite (finite, Finite)
+
 import           Day4.Input (puzzleData)
 
-import Data.Vector.Sized ()
-import qualified Data.Vector.Sized as V
-import           Data.Vector.Unboxed.Sized ()
-import Data.String.Here (here)
+import           Prelude hiding (replicate)
+import           Data.Vector.Sized (replicate, (//) ) 
+
 import qualified Data.Text as T
 import Data.Text (pack)
 import Day4.Puzzle
-import Day4.SleepRange
-import Day4.Minutes
-import Day4.Ranges
-import Day4.Time
-import SpecHelper
 
--- instance UV.Unbox a => UV.Unbox (Sum a)
+import SpecHelper
 
 spec :: Spec
 spec = describe "Something" $ do
@@ -54,30 +48,28 @@ spec = describe "Something" $ do
   context "puzzle 1 " $ do
     let  exampleShift = [SleepRange $ SpanRange (5*60) (25*60)]
          sleep1min = SleepRange $ SpanRange (5*60) (6*60)
-    context "sleep per shift" $
-      it "should 5..25 -> 19 (not 20)" $ asleepFor exampleShift `shouldBe` 19
     context "minutes per shift" $ 
       it "should 5..25 ->  " $ asleepMinutes (Prelude.head exampleShift) `shouldBe` ([5..24] :: [ℤ/60]) 
     
     context "fixed vectors" $ do
       context "countFinite" $ do
         it "count single item" 
-          $          countFinite (V.replicate 0) (finite <$>[5] :: [Finite 60] )
-          `shouldBe` V.replicate 0 V.// [(5,1)]
+          $          countFinite (finite <$>[5] :: [Finite 60] )
+          `shouldBe` replicate 0 // [(5,1)]
         it "count double item" 
-          $          countFinite (V.replicate 0) (finite <$>[5,5] :: [Finite 60] )
-          `shouldBe` V.replicate 0 V.// [(5,2)]
+          $          countFinite (finite <$>[5,5] :: [Finite 60] )
+          `shouldBe` replicate 0 // [(5,2)]
         it "count multiple different item" 
-          $          countFinite (V.replicate 0) (finite <$>[5,5,1,2,3,4] :: [Finite 60] )
-          `shouldBe` V.replicate 0 V.// [(5,2),(1,1),(2,1),(3,1),(4,1)]
+          $          countFinite (finite <$>[5,5,1,2,3,4] :: [Finite 60] )
+          `shouldBe` replicate 0 // [(5,2),(1,1),(2,1),(3,1),(4,1)]
 
       context "minuteCount" $ do
         it "should be [0000011111111111111111110000]" 
           $          minuteCount [Prelude.head exampleShift]
-          `shouldBe` (V.replicate 0 :: MinuteCount Int) V.// ((,1) <$> [5..24])
+          `shouldBe` (replicate 0 :: MinuteCount Int) // ((,1) <$> [5..24])
         it "should be [00000100000]" 
           $          minuteCount [sleep1min]
-          `shouldBe` (V.replicate 0 :: MinuteCount Int)  V.//  [(5,1)]
+          `shouldBe` (replicate 0 :: MinuteCount Int)  //  [(5,1)]
     context "counts" $ do
       it "should 5..6 -> [(5,1)]" $ counts [5 :: ℤ/60] `shouldBe` Map.fromList [(5,1)]
       it "should [5,6,5] -> [(5,2), (6,1)]" $ counts [5 :: ℤ/60, 6, 5] `shouldBe` Map.fromList [(5,2), (6, 1)]
@@ -90,10 +82,6 @@ spec = describe "Something" $ do
           [Raw (simpleShifts, 10, 5) (Just 2)
           ,Raw (simpleShifts, 10, 1) (Just 0)]
 
-    context "range length" $
-      allSamplesShouldBe finiteLength 
-        [ Raw (SingletonRange 10) 0
-        , Raw (SpanRange 10 20) 10]
     context "actual puzzle" $ do
       it "should ahve a solution (FOR REAL)" $
          solution <$> parseOnly parseInputB puzzleData `shouldBe` Right 125444

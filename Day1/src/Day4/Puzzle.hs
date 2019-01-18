@@ -1,19 +1,28 @@
 {- HLINT ignore "Unused LANGUAGE pragma" -}
 
+-- For Text
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
 
-module Day4.Puzzle where
+module Day4.Puzzle
+  ( module Day4.SleepRange
+  , module Day4.Minutes
+  , module Day4.Time
+  , module Day4.Puzzle
+  , module Day4.Sized
+  , module Day4.Event
+  , module Data.Modular
+  , module Data.Attoparsec.Text 
+  , module Data.Range.Range
+  , module Data.Finite
+  , module Data.Vector.Sized
+  , module Counting
+  )
+where
 
 
 import           Control.Applicative
@@ -25,31 +34,19 @@ import           Control.Lens.TH                ( makeLenses )
 import           Data.Functor
 import           Data.Function                  ( on )
 import           Data.Foldable                  ( maximumBy )
-import           Data.Monoid                    ( Sum )
 import           Data.Map                       ( Map
                                                 , (!)
                                                 )
 import qualified Data.Map                      as Map
 import           Data.Modular
 import           Data.Ord                       ( comparing )
-import           Data.Attoparsec.Text          as P
+import           Data.Attoparsec.Text          
 import           Data.List                      ( sort
                                                 , sortOn
                                                 )
 import           Data.Time
-import           Data.Time.Clock                ( secondsToDiffTime
-                                                , diffUTCTime
-                                                , NominalDiffTime
-                                                )
-import           Data.Time.Lens
-import           Data.Fixed
-
+import           Data.Time.Clock                ( secondsToDiffTime )
 import           Data.Range.Range
-
-import           Data.String.Here               ( here )
-import qualified Data.Text                     as T
-import           Data.Text                      ( pack )
-
 import           Data.Vector.Sized              ( Vector
                                                 , ifoldr
                                                 )
@@ -60,19 +57,10 @@ import           Safe.Foldable
 import           Day4.SleepRange
 import           Day4.Time
 import           Day4.Minutes
+import           Day4.Sized
+import           Day4.Event
+import           Counting
 
-
-type EventTime = UTCTime
-timestampP :: Parser EventTime
-timestampP = do
-  yyyy <- "[" *> decimal
-  mm   <- "-" *> decimal
-  dd   <- "-" *> decimal
-  hh   <- " " *> decimal
-  mins <- ":" *> decimal
-  _    <- string "]"
-  return $ UTCTime (fromGregorian yyyy mm dd)
-                   (secondsToDiffTime $ (hh * 60 + mins) * 60)
 
 {- Guard -}
 type Guard = Integer
@@ -94,29 +82,6 @@ instance Show a => Show (WakeEvent a)
   show WakesUp         = "wakes up"
   show FallsAsleep     = "falls asleep"
 
-{- Event -}
-data Event a = At { _eventWhen::EventTime, _what :: a }
-  deriving (Eq)
-
-makeLenses ''Event
-
-instance Show a => Show (Event a)
-  where
-  show (At t a) =
-    "["
-      ++ formatTime defaultTimeLocale "%Y-%m-%d %H:%M" t
-      ++ "] "
-      ++ show a
-      ++ "\n"
-
-instance (Eq a) => Ord (Event a)
-  where
-  compare = compare `on` view eventWhen
-
-eventP :: Parser a -> Parser (Event a)
-eventP aP = At <$> timestampP <*> aP <* skipSpace
-
-
 type GuardEvent = Event (WakeEvent Guard)
 
 
@@ -130,7 +95,7 @@ toWakeEvents _ = []
 data Shift a = Shift { _shiftStart :: UTCTime
                      , _shiftGuard::Guard
                      , _shiftWhat :: a}
-  deriving (Eq, Functor)
+  deriving (Eq)
 makeLenses ''Shift
 
 instance Show (Shift [SleepRange])
@@ -169,11 +134,7 @@ shiftP mkRange = do
 type GuardSleep = Vector 60 Integer
 
 
-counts :: (Num b, Ord a) => [a] -> Map a b
-counts ms = build $ project <$> ms
- where
-  project = (, 1)
-  build   = Map.fromListWith (+)
+
 
 minutesForGuard :: Map Guard GuardSleep -> Guard -> Map Min60 Integer
 minutesForGuard = (minutesForGuard' .) . (!)
