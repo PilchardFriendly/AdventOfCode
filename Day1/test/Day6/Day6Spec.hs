@@ -98,6 +98,14 @@ a.a..
 43210
 |]
         
+        it "simple simulation should display claims" $
+            displayPixels (mkLayer3.simulate.mkLayer2 $  Puzzle $ NE.fromList [(0,0),(1,1),(4,4)]) `shouldBe` [here|
+A····
+·Bbb·
+·bb·c
+·b·cc
+··ccC
+|]
 
     -- context "Moves" $ do
         -- it "0 should be identity" $ map ($ (0::Int,0)) (moves 0) `shouldBeSet` [(0,0)]
@@ -107,7 +115,7 @@ a.a..
 --         it "should display empty space" $ displayPixels (Bounds (Coords (0,0) ()) (Coords (5,5) ()) ()) `shouldBe` [here|
            
 --         |]
-    context "OnlyScore" $ do
+    context "OnlyScore" $
         it "should map score zero to 0" $
            pixel (OnlyScore 0 $ Right 6) `shouldBe` '0'
     context "Example" $ do

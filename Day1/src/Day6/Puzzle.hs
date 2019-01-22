@@ -76,6 +76,14 @@ data Position = Starting Start
               | Moving Move Start
   deriving (Eq, Show)
 
+positionStart :: Lens' Position Start
+positionStart = lens sa asa
+  where
+    sa (Starting s) = s
+    sa (Moving _ s) = s
+    asa (Starting _) s = Starting s
+    asa (Moving m _) s = Moving m s
+
 
 instance Scoreable Move where
     score (Move r v h) = (toInteger v) + (toInteger h)
@@ -115,11 +123,20 @@ newtype Puzzle = Puzzle (NE.NonEmpty XY)
 
 
 instance Pixels Start where
-    pixels (Start xy c) = [(xy, toUpper c)]
+    pixels s@(Start xy _) = [(xy,pixel s)]
+
+instance AsPixel Start
+  where
+    pixel (Start _ c) = toUpper c
 
 instance Pixels Position where
     pixels (  Starting s           ) = pixels s
-    pixels p@(Moving m (Start xy c)) = [(intoPartition p :: XY, c)]
+    pixels p@(Moving _ (Start xy c)) = [(intoPartition p :: XY, pixel p)]
+
+instance AsPixel Position 
+  where
+    pixel (Starting s) = pixel s
+    pixel (Moving _ s) = toLower $ pixel s
 
 
 
@@ -181,7 +198,8 @@ instance Steppable Layer1 where
             ps' = concatMap nextSteps ps
 
 
-newtype Layer2 = Layer2 { _unLayer2 :: Bounds Layer1 }
+newtype Layer2 = MkLayer2 { _unLayer2 :: Bounds Layer1 }
+  deriving stock (Eq, Show) 
   deriving newtype (HasBounds, Pixels)
 
 makeLenses ''Layer2
@@ -196,7 +214,7 @@ expand' lens f s = flip (set lens) s <$> f (view lens s)
 
 
 instance Steppable Layer2 where
-    nextSteps l2@(Layer2 b) =  expand' (unLayer2.boundsA) next l2
+    nextSteps l2@(MkLayer2 b) =  expand' (unLayer2.boundsA) next l2
         where
             next :: Layer1 -> [Layer1]
             next = filter (not.isFinished) . 
@@ -210,7 +228,7 @@ mkLayer2 :: Puzzle -> Layer2
 mkLayer2 p@(Puzzle b )= go p
     where
         go :: Puzzle -> Layer2
-        go = Layer2 . ((over boundsA) (layer1.toStep1)) . mkBounds
+        go = MkLayer2 . ((over boundsA) (layer1.toStep1)) . mkBounds
         toStep1 :: Puzzle -> Step1
         toStep1 (Puzzle xys)= xys
 
@@ -226,6 +244,24 @@ solve p@(Puzzle b )= go p
     where
         go = simulate.mkLayer2
 
+newtype Claim = MkClaim { _unClaim :: Either [Position] Position }   
+  deriving (Show,Eq)
+
+instance AsPixel Claim 
+  where
+    pixel = either (const '·') pixel . _unClaim
+
+newtype Layer3 = MkLayer3 { _unLayer3 :: Bounds (Map XY Claim) }
+  deriving stock (Eq, Show)
+  deriving newtype (HasBounds, Pixels)
+
+mkLayer3 :: Layer2 -> Layer3
+mkLayer3 = MkLayer3 . over ( boundsA ) (go._layer1Map) . _unLayer2
+  where 
+     go :: Map XY (OnlyScore Position)-> Map XY Claim
+     go = M.map elem
+     elem :: OnlyScore Position -> Claim
+     elem (OnlyScore _ e )= MkClaim e
 -- instance Pixels Layer1
 --     where
 --         pixels l1 = 
