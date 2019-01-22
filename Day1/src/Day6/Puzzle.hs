@@ -11,10 +11,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Day6.Puzzle
-    ( module Data.Attoparsec.Text
-    , module Day6.Puzzle
+    ( module Day6.Puzzle
     , module Day6.XY
     , module Day6.Bounds
     , module Day6.Pixels
@@ -26,34 +26,44 @@ where
 import           Data.Attoparsec.Text
 import           Numeric.Natural
 import           Data.Char
-import           Data.List                      (
-                                                  intercalate
+import           Data.Either
+import           Data.Function
+import           Data.List                      ( intercalate
+                                                , maximumBy
                                                 )
 import qualified Data.List.NonEmpty            as NE
+
 import           Data.Map                       ( Map
                                                 , (!?)
                                                 )
 import           Data.Maybe
 import qualified Data.Map                      as M
+import           Data.Ord
 import           Data.Semigroup                 ( Min(..)
                                                 , Max(..)
+                                                , Sum(..)
+                                                , Endo(..)
                                                 )
 import           Data.Semigroup.Foldable        ( foldMap1 )
+import           Data.Set (Set)
+import qualified          Data.Set as S
 
 import           Control.Applicative
 import           Control.Arrow
 import           Control.Lens
 import           Control.Lens.TH                ( makeLenses )
 
-import Day6.MinMax
-import Day6.Scoreable
-import Day6.OnlyScore
-import Day6.Bounds
-import Day6.XY
-import Day6.Pixels
-import Day6.Pixels.Puzzle
-import Day6.Partitionable
-import Day6.Steppable
+import           Day6.MinMax
+import           Day6.Scoreable
+import           Day6.OnlyScore
+import           Day6.Bounds
+import           Day6.XY
+import           Day6.Pixels
+import           Day6.Pixels.Puzzle
+import           Day6.Partitionable
+import           Day6.Steppable
+import Maxing
+import Debug.Trace
 
 
 data Rotation = Rotate0 | Rotate90 | Rotate180 | Rotate270
@@ -72,77 +82,64 @@ data Move = Move Rotation Natural {- Must be at least 1-} Natural
 data Start = Start XY Char
   deriving (Eq, Show)
 
-data Position = Starting Start
-              | Moving Move Start
+startChar :: Lens' Start Char
+startChar = lens f g
+  where
+    f (Start _ c) = c
+    g (Start s _) c = (Start s c)
+
+data Position = MkPosition XY Start
   deriving (Eq, Show)
 
 positionStart :: Lens' Position Start
 positionStart = lens sa asa
   where
-    sa (Starting s) = s
-    sa (Moving _ s) = s
-    asa (Starting _) s = Starting s
-    asa (Moving m _) s = Moving m s
+    sa (MkPosition _ s) = s
+    asa (MkPosition xy _) s = MkPosition xy s 
 
 
-instance Scoreable Move where
-    score (Move r v h) = (toInteger v) + (toInteger h)
-    
 instance Scoreable Position where
-    score (Moving m _) = -score m
-    score (Starting _) = 0
-
-
-instance Steppable Move where
-    nextSteps (Move r v h) = [Move r (v + 1) h, Move r v (h + 1)]
-instance Steppable Position where
-    nextSteps (Starting s) =
-        (\r -> Moving (Move r 1 0) s)
-            <$> [Rotate0, Rotate90, Rotate180, Rotate270]
-    nextSteps (Moving m s) = (\m' -> Moving m' s) <$> nextSteps m
-
+    score (MkPosition (x,y) (Start (ox,oy) _)) = 0 - (abs $ ox-x) - (abs $ oy -y)
 
 
 instance Partitionable Position XY
   where
     intoPartition = go
       where
-        tupleToInt = over both toInteger
         go :: Position -> (Integer, Integer)
-        go (Starting (Start o _)                  ) = o
-        go (Moving (Move r v h) (Start (oX, oY) _)) = (uX + oX, uY + oY)
-            where (uX, uY) = rotate r $ tupleToInt (h, v)
+        go (MkPosition xy _) = xy
 
 
 
-
-
-newtype Puzzle = Puzzle (NE.NonEmpty XY)
+newtype Puzzle = Puzzle { _puzzleXYs :: NE.NonEmpty XY }
   deriving (Eq, Show)
+makeLenses ''Puzzle
 
 
 
 instance Pixels Start where
-    pixels s@(Start xy _) = [(xy,pixel s)]
+    pixels s@(Start xy _) = [(xy, pixel s)]
 
 instance AsPixel Start
   where
     pixel (Start _ c) = toUpper c
 
 instance Pixels Position where
-    pixels (  Starting s           ) = pixels s
-    pixels p@(Moving _ (Start xy c)) = [(intoPartition p :: XY, pixel p)]
+    pixels p@(MkPosition xy (Start _ c)) = [(xy, pixel p)]
 
-instance AsPixel Position 
+instance AsPixel Position
   where
-    pixel (Starting s) = pixel s
-    pixel (Moving _ s) = toLower $ pixel s
+    pixel p@(MkPosition xy s@(Start oxy _)) | xy == oxy = pixel s
+                                            | otherwise = toLower $ pixel s
 
 
 
 
 -- instance Pixels a => Pixels (Bounds a)
 
+
+inBoundsPosition :: Bounds a -> Position -> Bool
+inBoundsPosition b = inBoundsXY b . intoPartition
 
 
 mkBounds :: Puzzle -> Bounds Puzzle
@@ -154,100 +151,105 @@ pairP :: Parser XY
 pairP =
     mkUnitCoord
         <$> (decimal <* skipSpace)
-        <*> (string "," *> decimal <* (endOfLine <|> endOfInput))
+        <*> (string "," *> skipSpace *> decimal <* (endOfLine <|> endOfInput))
 
 puzzleP :: Parser Puzzle
 puzzleP = Puzzle . NE.fromList <$> many1' pairP
 
 type Step1 = NE.NonEmpty XY
 type Step2 = [Start]
-type Step3 = [Position]
-type Step4 = [Position]
 
 step2 :: Step1 -> Step2
 step2 = imap go . NE.toList
   where
     go :: Int -> XY -> Start
-    go n xy = Start xy $ chr (n + ord 'a')
+    go n xy = Start xy $ charFor n
+    charFor n | n < 26 = chr (n + ord 'a')
+              | otherwise = chr (n + 0x4e00)
 
-step3 :: Step2 -> Step3
-step3 = map Starting
+data Layer1b = Layer1b {
+    _layer1bStart :: Start
+    ,_layer1bMap :: Map XY (OnlyScore Position)}
+    deriving (Eq, Show)
 
-step4 :: Step3 -> Step4
-step4 = concatMap nextSteps
-
-data Layer1 = Layer1 {
-    _layer1Positions :: [Position], 
-    _layer1Map :: (Map XY (OnlyScore Position))}
-  deriving (Eq, Show)
-instance (Pixels Layer1) 
+makeLenses ''Layer1b
+instance Pixels Layer1b 
   where
-    pixels = pixels._layer1Map
+    pixels = pixels . _layer1bStart
 
-makeLenses ''Layer1
+layer1b :: Bounds Step1 -> Bounds [Layer1b]
+layer1b b = (over boundsA) go b
+  where
+    go :: Step1 -> [Layer1b]
+    go =  fmap step.step2 
+    step :: Start -> Layer1b
+    step s = Layer1b s . M.fromList $
+             ((intoPartition &&& mkOnlyScore ) . flip MkPosition s) <$> 
+             boundsXYs b
 
-layer1 :: Step1 -> Layer1
-layer1 xys = Layer1 ps M.empty where ps = step3 . step2 $ xys
-
--- Layer1FilterBounds :: Bounds a -> Layer1 -> Layer1
--- layer1FilterBounds b (Layer1 ps m) = Layer1 (filter ) 
-instance Steppable Layer1 where
-    nextSteps (Layer1 ps m)= [Layer1 ps' m']
-        where
-            m'  = foldl accumulateUniqueScore m ps
-            ps' = concatMap nextSteps ps
-
-
-newtype Layer2 = MkLayer2 { _unLayer2 :: Bounds Layer1 }
-  deriving stock (Eq, Show) 
+newtype Layer2b = MkLayer2b { _unLayer2b :: Bounds [Layer1b] }
+  deriving stock (Eq, Show)
   deriving newtype (HasBounds, Pixels)
 
-makeLenses ''Layer2
-
-
-inBoundsPosition :: Bounds a -> Position -> Bool
-inBoundsPosition b = (inBoundsXY b) . intoPartition
-
+makeLenses ''Layer2b
 
 expand' :: (Functor t) => Lens' s a -> (a -> t a) -> s -> t s
 expand' lens f s = flip (set lens) s <$> f (view lens s)
 
 
-instance Steppable Layer2 where
-    nextSteps l2@(MkLayer2 b) =  expand' (unLayer2.boundsA) next l2
+mkLayer2b :: Puzzle -> Layer2b
+mkLayer2b p@(Puzzle b) = go p
+    where
+    go :: Puzzle -> Layer2b
+    go = MkLayer2b . layer1b . (over boundsA) toStep1 . mkBounds
+    toStep1 :: Puzzle -> Step1
+    toStep1 (Puzzle xys) = xys    
+
+type LeftMapFold k v = (Ord k, Semigroup v) => Map k v -> (k, v) -> Map k v
+
+type LeftFoldToMap k1 v1 k v
+    =  (Ord k1, Ord k, Semigroup v)
+    => (v1 -> Maybe (k, v))
+    -> Map k1 v1
+    -> Map k v
+
+
+charForSoleClaim :: Claim -> Maybe Char
+charForSoleClaim = preview (_Right . positionStart . startChar) . _unClaim
+
+foldlToMap :: LeftFoldToMap k1 v1 k v
+foldlToMap f = foldl go M.empty . mapMaybe f . M.elems
+  where
+    go :: LeftMapFold c i
+    go m (c, i) = M.insertWith (<>) c i m
+
+solution :: Set Char -> Map XY Claim -> (Char, Integer)
+solution exclude = (second getSum) . go
+  where
+    go :: Map XY Claim -> (Char, Sum Integer)
+    go = findMaxValueSnd . notMember . foldlToMap score
+    notMember :: Map Char (Sum Integer) -> Map Char (Sum Integer)
+    notMember m = S.foldr M.delete m exclude 
+
+    score :: Claim -> Maybe (Char, Sum Integer)
+    score =
+        fmap (, Sum 1) . charForSoleClaim
+
+nonSolutions :: Layer3 -> Set Char
+nonSolutions = (uncurry go) . (boundsBorders &&& _boundsA) . _unLayer3
         where
-            next :: Layer1 -> [Layer1]
-            next = filter (not.isFinished) . 
-                   fmap trimBounds . 
-                   nextSteps
-            trimBounds = over (layer1Positions) $ filter (inBoundsPosition b) 
-            isFinished :: Layer1 -> Bool
-            isFinished = null . view layer1Positions 
-        
-mkLayer2 :: Puzzle -> Layer2 
-mkLayer2 p@(Puzzle b )= go p
-    where
-        go :: Puzzle -> Layer2
-        go = MkLayer2 . ((over boundsA) (layer1.toStep1)) . mkBounds
-        toStep1 :: Puzzle -> Step1
-        toStep1 (Puzzle xys)= xys
+            go :: [XY] -> Map XY Claim -> Set Char
+            go xys m = S.fromList $ (mapMaybe charForSoleClaim ) $ (m M.!) <$> xys
 
-simulate :: (Steppable a) => a -> a
-simulate s = go s (nextSteps s)
-    where 
-        go :: (Steppable a) => a -> [a]-> a
-        go s [] = s
-        go s (next:_) = go next (nextSteps next)
+solveB :: Puzzle -> (Char, Integer)
+solveB =  go
+   where
+      go = (uncurry solution) . (nonSolutions &&& _boundsA . _unLayer3) . mkLayer3b . mkLayer2b
 
-solve :: Puzzle -> Layer2
-solve p@(Puzzle b )= go p
-    where
-        go = simulate.mkLayer2
-
-newtype Claim = MkClaim { _unClaim :: Either [Position] Position }   
+newtype Claim = MkClaim { _unClaim :: Either [Position] Position }
   deriving (Show,Eq)
 
-instance AsPixel Claim 
+instance AsPixel Claim
   where
     pixel = either (const '·') pixel . _unClaim
 
@@ -255,13 +257,12 @@ newtype Layer3 = MkLayer3 { _unLayer3 :: Bounds (Map XY Claim) }
   deriving stock (Eq, Show)
   deriving newtype (HasBounds, Pixels)
 
-mkLayer3 :: Layer2 -> Layer3
-mkLayer3 = MkLayer3 . over ( boundsA ) (go._layer1Map) . _unLayer2
-  where 
-     go :: Map XY (OnlyScore Position)-> Map XY Claim
-     go = M.map elem
-     elem :: OnlyScore Position -> Claim
-     elem (OnlyScore _ e )= MkClaim e
--- instance Pixels Layer1
---     where
---         pixels l1 = 
+
+mkLayer3b :: Layer2b -> Layer3
+mkLayer3b = MkLayer3 . over (boundsA) (go . fmap _layer1bMap) . _unLayer2b
+ where
+    go :: [Map XY (OnlyScore Position)] -> Map XY Claim
+    go =  M.map elem . M.unionsWith (<>)
+    elem :: OnlyScore Position -> Claim
+    elem (OnlyScore _ e) = MkClaim e
+

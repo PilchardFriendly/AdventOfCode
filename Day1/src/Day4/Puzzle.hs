@@ -21,6 +21,7 @@ module Day4.Puzzle
   , module Data.Finite
   , module Data.Vector.Sized
   , module Counting
+  , module Maxing
   )
 where
 
@@ -60,6 +61,7 @@ import           Day4.Minutes
 import           Day4.Sized
 import           Day4.Event
 import           Counting
+import Maxing
 
 
 {- Guard -}
@@ -152,8 +154,6 @@ toSolveable ss = build $ project <$> ss
   project = view shiftGuard &&& view shiftWhat
   build   = Map.map minuteCount . Map.fromListWith (++)
 
-findMaxValue :: Ord b => Map a b -> a
-findMaxValue = fst . maximumBy (comparing snd) . Map.toList
 
 solution :: [Shift [SleepRange]] -> Integer
 solution ss = fromInteger findSleepiestGuard

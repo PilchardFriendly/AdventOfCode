@@ -20,7 +20,7 @@ displayPixels a = intercalate "\n" $ line <$> (boundsYs box)
     where
     box   = bounds a
     chars = M.fromList $ pixels a
-    pixelAt xy = fromMaybe '.' $ chars !? xy
+    pixelAt xy = fromMaybe ' ' $ chars !? xy
     line y = [ pixelAt (x, y) | x <- (boundsXs box) ] 
     
 
