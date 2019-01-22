@@ -35,6 +35,7 @@ dependencies:
 - vector-sized
 - primitive
 - finite-typelits
+- semigroupoids
 
 library:
   source-dirs: src

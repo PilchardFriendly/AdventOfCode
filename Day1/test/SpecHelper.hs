@@ -5,6 +5,7 @@ module SpecHelper
       ,Sample(Raw, Annotated, Parsed, Summarised)
       ,allSamplesShouldBe
       ,module Data.String.Here
+
     ) where
 
 import Test.Hspec
