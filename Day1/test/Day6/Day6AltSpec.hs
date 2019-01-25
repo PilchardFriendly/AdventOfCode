@@ -6,11 +6,9 @@ module Day6.Day6AltSpec (spec) where
 import Data.Attoparsec.Text
 
 import           Control.Applicative ( (<|>))
-import Control.Arrow ((***), (&&&))
+import Control.Arrow ((&&&))
 import Control.Lens
-import Control.Lens.TH    
 import Linear (V2(..), _x, _y)
-import Data.Function
 import qualified Data.Ix as Ix
 import Data.Semigroup (Min(..), Max(..))
 import Data.Semigroup.Foldable (foldMap1, Foldable1(..))
@@ -19,7 +17,6 @@ import qualified Data.Map as M
 import Data.Maybe (mapMaybe)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
-import Data.Set (Set)
 import qualified Data.Set as S
 import Day6.MinMax
 import Day6.Input (puzzleData)
@@ -60,6 +57,9 @@ labelXY pts p = do
     pure $ closest
     where
         distances = pts <&> (id &&& distance p)
+        
+regionScoreXY :: NonEmpty XY -> XY -> Integer
+regionScoreXY pts p = sum $ (distance p) <$>  pts
 
 scoreXYs :: NonEmpty XY -> [XY] -> Map XY Int
 scoreXYs pts = counts.mapMaybe (labelXY pts)
@@ -75,6 +75,17 @@ solution pts = M.difference insides outsides
 
 solve :: NonEmpty XY -> Maybe (XY, Int)
 solve = findMaxValueSnd . solution
+
+solution2 :: Integer -> NonEmpty XY -> [XY]
+solution2 n pts = fmap fst . filter (\x -> snd x < n) $ scores box
+  where
+    box = mkBox pts
+    scores = fmap (id &&& regionScoreXY pts) . boxRange
+
+solve2 :: Integer -> NonEmpty XY -> Maybe Int
+solve2 n = Just . length . solution2 n
+
+
 
 v2P :: Parser XY
 v2P =
@@ -126,6 +137,15 @@ spec = describe "Day6 Alternative" $ do
   context "scoreXYs" $ do
     context "3x3" $ do
       it "should be look like:" $ (scoreXYs thr3Pts) (boxRange thr3By3Box) `shouldBe` M.fromList [(V2 0 1,3),(V2 2 3,3)]
+  context "solution 2" $ do
+    context "for" $ do
+      context (show example) $ do
+        it "should be 33" $ (solve2 32) example `shouldBe` Just 16
+        
+      context "real thing" $ do
+        let subject = parseOnly puzzleP puzzleData
+        it "should be ??" $ (solve2 10000) <$> subject `shouldBe` Right (Just 47841)
+  
   context "solution" $ do
     context "for" $ do
       context (show example) $ do
