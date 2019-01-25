@@ -36,6 +36,7 @@ dependencies:
 - primitive
 - finite-typelits
 - semigroupoids
+- linear
 
 library:
   source-dirs: src

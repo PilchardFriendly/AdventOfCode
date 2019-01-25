@@ -76,7 +76,7 @@ spec = describe "Something" $ do
 
     context "solve simple" $ do
       let simpleShifts = [Shift baseDate 10 [mkRange (minutes +~5) (minutes +~25) , mkRange (minutes +~5) (minutes +~6)]]
-      it "should have have solution of 5" $ solution simpleShifts `shouldBe` 50
+      it "should have have solution of 5" $ solution simpleShifts `shouldBe` Just 50
       context "minutesForGuard" $ 
         allSamplesShouldBe (\(a,c,b) -> Map.lookup b $ minutesForGuard (toSolveable a) c)
           [Raw (simpleShifts, 10, 5) (Just 2)
@@ -84,7 +84,7 @@ spec = describe "Something" $ do
 
     context "actual puzzle" $ do
       it "should ahve a solution (FOR REAL)" $
-         solution <$> parseOnly parseInputB puzzleData `shouldBe` Right 125444
+         solution <$> parseOnly parseInputB puzzleData `shouldBe` Right (Just 125444)
       -- it "should have a solution 2 (errorCall" $
       --    evaluate (solution2 <$> parseOnly parseInputB puzzleData) `shouldThrow` anyErrorCall
       it "should have a solution 2" $
@@ -154,7 +154,7 @@ spec = describe "Something" $ do
       it "should sort input" $ 
         parsedBExample `shouldBe` parsedExample
       it "should have solution" $
-        solution <$> parsedExample `shouldBe` Right 240
+        solution <$> parsedExample `shouldBe` Right (Just 240)
       it "should have solution (parseB)" $
         solution <$> parsedBExample `shouldBe` solution <$> parsedExample
       it "should have solution 2b (parseB)" $

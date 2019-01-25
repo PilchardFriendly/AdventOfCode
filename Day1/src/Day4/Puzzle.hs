@@ -155,9 +155,12 @@ toSolveable ss = build $ project <$> ss
   build   = Map.map minuteCount . Map.fromListWith (++)
 
 
-solution :: [Shift [SleepRange]] -> Integer
-solution ss = fromInteger findSleepiestGuard
-  * unMod (findSleepiestMinute findSleepiestGuard)
+solution :: [Shift [SleepRange]] -> Maybe Integer
+solution ss = do
+  g <- findSleepiestGuard
+  m <- findSleepiestMinute g
+  let gVal = fromInteger g
+  return $ gVal * unMod m
  where
   findSleepiestGuard  = findMaxValue $ sum <$> base
   findSleepiestMinute = findMaxValue . minutesForGuard base
