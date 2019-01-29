@@ -5,6 +5,7 @@ module SpecHelper
       ,Sample(Raw, Annotated, Parsed, Summarised)
       ,allSamplesShouldBe
       ,module Data.String.Here
+      ,module Control.Lens
 
     ) where
 
@@ -14,6 +15,7 @@ import Prelude hiding(read)
 import qualified Text.Read as TR
 import Data.String.Combinators
 import Data.String.Here
+import Control.Lens
   
 shouldAllBe :: (IsString a, Show a, Eq b, Show b)
           => (a -> b)

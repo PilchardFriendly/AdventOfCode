@@ -7,7 +7,7 @@ import Data.Attoparsec.Text
 
 import           Control.Applicative ( (<|>))
 import Control.Arrow ((&&&))
-import Control.Lens
+
 import Linear (V2(..), _x, _y)
 import qualified Data.Ix as Ix
 import Data.Semigroup (Min(..), Max(..))

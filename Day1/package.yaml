@@ -37,6 +37,7 @@ dependencies:
 - finite-typelits
 - semigroupoids
 - linear
+- pqueue
 
 library:
   source-dirs: src
