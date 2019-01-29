@@ -1,7 +1,6 @@
 {-# LANGUAGE QuasiQuotes, OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TransformListComp #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 module Day7.Day7Spec (spec) where
@@ -10,16 +9,13 @@ import Control.Applicative
 import Control.Arrow ((***))
 import SpecHelper
 import Data.List (sort)
-import Data.Maybe ( mapMaybe )
 import qualified Data.Set as S
 import Data.Set (Set)
 import Data.Char
 import Data.Ord
 import qualified Data.Map as M
-import Data.Semigroup (Max(..))
 import Data.Map (Map)
 import Data.Graph
-import GHC.Exts (groupWith, the)
 import Data.PQueue.Min (MinQueue(..))
 import qualified Data.PQueue.Min as PQMin
 import Day7.Input
@@ -87,17 +83,6 @@ instance Monoid (Distinct a) where
 mkDistinct :: Eq a => a -> Distinct a
 mkDistinct a = MkDistinct ((a ==),[a])
 
-thing:: Dependencies -> Map Part Int -> Int
-thing (p :-> ps) m = 1+ (getMax . (Max 0 <>) . foldMap Max . (mapMaybe $ flip M.lookup m) ) ps
-
-things ::forall a k v. (Ord k ) => (a -> Map k v -> (k,v)) -> [a] -> Map k v -> Map k v
-things f as m0 = foldl go m0 as
-  where
-    go :: Map k v -> a -> Map k v
-    go m a = M.insert k v m
-      where
-        (k,v) = f a m      
-
 
 popQ :: (Ord p, Eq p) => p -> (MinQueue p,Set p,Distinct p)  -> (MinQueue p,Set p,Distinct p)
 popQ p st@(q,existing,s) = case PQMin.minView q of
@@ -121,33 +106,6 @@ solve = tmp  . solution
     go3' dep@(d :-> (next:ds)) st@(q, qElems, s) 
       | S.member next qElems = go3' dep (popQ next st)
       | otherwise = go3' (d :-> ds) (q, qElems, s <> mkDistinct next)
-
-    --   tmp = go2 . concat
-    -- Aborted Attempt2
-    go2 :: [Dependencies] -> [Part]
-    go2 ds = concat . reverse . fmap snd $ [(the key, value) | (value, key) <- allScores,
-                                                then group by key using groupWith]
-      where
-        allScores = M.toList $ things doobris ds ( rootScores ds)
-        rootScores = M.fromList . fmap (,1) . findRoots
-    doobris :: Dependencies -> Map Part Int -> (Part, Int)
-    doobris d@(p :-> ps) m = (p, thing d m)
-
-
-    --Abort attempt 1
-    go ds = _distincts.snd $ foldl (flip step) ((findRoots ds),mempty) ds
-
-
-    step :: Dependencies -> (String,Distinct Part) -> (String,Distinct Part)
-    step (d :-> ds) st@(roots, sofar) = stepPart (ds ++ [d]) st
-    
-    stepPart :: [Part] -> (String,Distinct Part) -> (String, Distinct Part)
-    stepPart [] st = st
-    stepPart pts ([], sofar) = ([], foldl (<>) sofar (mkDistinct <$> pts))
-    stepPart parts@(pt:pts) st@(rts@(r:rs), sofar) | pt == r  = stepPart pts (rs,  sofar <> mkDistinct pt) -- short circuit
-                                             | pt > r         = stepPart parts (rs, sofar <> mkDistinct r)
-                                             | otherwise      = stepPart pts (rts, sofar <> mkDistinct pt)
-
 
 spec :: Spec
 spec = describe "Sleigh" $ do
