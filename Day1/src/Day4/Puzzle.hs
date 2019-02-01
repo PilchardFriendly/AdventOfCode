@@ -167,19 +167,20 @@ solution ss = do
   base                = toSolveable ss
 
 solution2b :: [Shift [SleepRange]] -> Maybe (Min60, Guard)
-solution2b ss = second fst <$> solution2b'
-  (foldMap go $ Map.toList $ minutesForGuard' <$> toSolveable ss)
+solution2b = fmap (second fst) . solution2b' . go
  where
-  go :: (a, Map b c) -> [(a, (b, c))]
-  go (a, bc) = (a, ) <$> Map.toList bc
+  go = foldMap tally . Map.toList . fmap minutesForGuard' . toSolveable
+  tally :: (a, Map b c) -> [(a, (b, c))]
+  tally (a, bc) = (a, ) <$> Map.toList bc
 
 solution2b'
   :: (Ord b, Num b) => [(Guard, (Min60, b))] -> Maybe (Min60, (Guard, b))
-solution2b' as =
+solution2b' =
   maximumByMay (comparing (snd . snd))
-    $ Map.toList
-    $ Map.mapMaybe scoreMinute
-    $ Map.fromListWith mappend (twizzle <$> as)
+    . Map.toList
+    . Map.mapMaybe scoreMinute
+    . Map.fromListWith mappend 
+    . fmap twizzle
  where
   twizzle :: (a, (b, c)) -> (b, [(a, c)])
   twizzle (k, (v1, v2)) = (v1, [(k, v2)])

@@ -1,24 +1,27 @@
 {-# LANGUAGE QuasiQuotes, OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+
 module Day7.Day7Spec (spec) where
 import Data.Attoparsec.Text
 import Control.Applicative
 import Control.Arrow ((***))
+import Control.Monad (mfilter)
 import SpecHelper
 import Data.List (sort)
 import qualified Data.Set as S
 import Data.Set (Set)
 import Data.Char
-import Data.Ord
 import qualified Data.Map as M
 import Data.Map (Map)
 import Data.Graph
-import Data.PQueue.Min (MinQueue(..))
-import qualified Data.PQueue.Min as PQMin
+
 import Day7.Input
+import ActivityQueue
+import RFunctor
+import Distinct
+
 
 type Part = Char
 type Instruction = (Part, Part)
@@ -42,7 +45,7 @@ directDeps = fmap  make . M.toList . foldr go M.empty
     where
       make (p, ps) =p :-> S.toList ps
       go :: Instruction -> Map Part (Set Part) -> Map Part (Set Part)
-      go (f, s) m = M.insertWith (<>) f (S.singleton s) m
+      go (f, s) = M.insertWith (<>) f (S.singleton s)
 
 
 toGraph :: [Dependencies] -> [SCC Dependencies]
@@ -62,32 +65,6 @@ findRoots = sort . S.toList . uncurry (flip S.difference) . (S.fromList *** S.fr
     go :: ([Part],[Part]) -> Dependencies -> ([Part],[Part])
     go (d, ds) (d' :-> ds') = (d':d, ds'++ds)
           
--- partial ordering
-newtype Distinct a = MkDistinct (a -> Bool, [a])
-instance Eq a => Eq (Distinct a ) where
-  a == b = _distincts a == _distincts b
-instance Ord a => Ord (Distinct a) where
-  compare = comparing _distincts
-_distinctF :: Distinct a -> (a -> Bool)
-_distinctF (MkDistinct d) = fst d
-_distincts :: Distinct a -> [a] 
-_distincts (MkDistinct d) = snd d
-
-instance Semigroup (Distinct a) where
-  (MkDistinct (fa, as)) <> (MkDistinct (fb, bs)) = 
-    MkDistinct ((\a -> (fa a || fb a)), as ++ (filter (not.fa) bs))
-
-instance Monoid (Distinct a) where
-  mempty = MkDistinct (const False,[])
-
-mkDistinct :: Eq a => a -> Distinct a
-mkDistinct a = MkDistinct ((a ==),[a])
-
-
-popQ :: (Ord p, Eq p) => p -> (MinQueue p,Set p,Distinct p)  -> (MinQueue p,Set p,Distinct p)
-popQ p st@(q,existing,s) = case PQMin.minView q of
- Just (p', q') | p >= p' -> (q', S.delete p' existing, s <> mkDistinct p')
- _ -> st
 
 solve :: [Instruction] -> String
 solve = tmp  . solution
@@ -96,16 +73,20 @@ solve = tmp  . solution
  
     tmp = _distincts.  go3 . concat
     go3 :: [Dependencies] -> Distinct Part
-    go3 ds = finish $ foldl (flip  go3') (PQMin.empty, mempty, mempty) ((mkRootDependencies <$> findRoots ds) ++ ds )
+    go3 ds = finish $ foldl (flip  go3') (emptyAQ, mempty) ((mkRootDependencies <$> findRoots ds) ++ ds )
     -- Append the remaining active elements
-    finish :: (MinQueue Part, Set Part, Distinct Part) -> Distinct Part
-    finish (active, _, s) = PQMin.foldlAsc (<>) s $ PQMin.map mkDistinct active
+    finish :: (ActivityQueue Part, Distinct Part) -> Distinct Part
+    finish (activity, s) = foldlAscAQ (<>) s $ fmapR mkDistinct activity
 
-    go3' :: Dependencies -> (MinQueue Part, Set Part, Distinct Part) -> (MinQueue Part, Set Part, Distinct Part)
-    go3' (d :-> []) (active, activeElems, s) = (PQMin.insert d active, S.insert d activeElems, s)
-    go3' dep@(d :-> (next:ds)) st@(q, qElems, s) 
-      | S.member next qElems = go3' dep (popQ next st)
-      | otherwise = go3' (d :-> ds) (q, qElems, s <> mkDistinct next)
+    go3' :: Dependencies -> (ActivityQueue Part, Distinct Part) -> (ActivityQueue Part, Distinct Part)
+    go3' (d :-> []) (q, s) = (queueAQ d q, s)
+    go3' dep@(d :-> (next:ds)) st@(q, s) 
+      | memberAQ next q = go3' dep (q', s')
+      | otherwise = go3' (d :-> ds) (q, s <> mkDistinct next)
+      where 
+        (minp', q') = dequeueAQ q -- minp' could be less than next
+        s' = (s <>) $ (maybe mempty mkDistinct) $ mfilter (next >=)  minp'
+
 
 spec :: Spec
 spec = describe "Sleigh" $ do
@@ -135,6 +116,6 @@ Step F must be finished before step E can begin.
       it "should solve to ACHOQRXSEKUGMYIWDZLNBFTJVP" $ (solve <$> subject) `shouldBe` Right "ACHOQRXSEKUGMYIWDZLNBFTJVP"
       it "should not solve to ACHOQRXSKEUGMYWIDZLNTBFJVP" $ (solve <$> subject) `shouldNotBe` Right "ACHOQRXSKEUGMYWIDZLNTBFJVP"
       it "should find roots" $ (findRoots . concat . solution) <$> subject `shouldBe` Right "AHQX"
-
+  -- context  "solving 2" $ do
   context "directDeps" $ do
     it "should world for a single one" $ (directDeps) [('A', 'C')] `shouldBe` ['A' :-> ['C']]
