@@ -99,8 +99,8 @@ Step B must be finished before step E can begin.
 Step D must be finished before step E can begin.
 Step F must be finished before step E can begin.    
 |]
-  context "parsing" $ do
-    context "example" $ do 
+  context "parsing" $ 
+    context "example" $  
       it "should parse to C <- A, C<- F, A <- B, A<-D, B <- E, D <-E, F <- E" $
          (parseOnly puzzleP) exampleText `shouldBe` Right [('A','C'),('F','C'),('B','A'),('D','A'),('E','B'),('E','D'),('E','F')]
   context "solving" $ do
@@ -109,13 +109,13 @@ Step F must be finished before step E can begin.
       it "should map A->C, B->D to ABCD" $ solve cadb `shouldBe` "ABCD"
       it "should find roots for A->C, B->D" $ (findRoots . concat . solution ) cadb `shouldBe` "AB"
     context "example" $ do
-      let subject = (parseOnly puzzleP exampleText)
+      let subject = parseOnly puzzleP exampleText
       it "should solve to CABDFE" $ (solve <$> subject) `shouldBe` Right "CABDFE"
     context "real thing" $ do
-      let subject = (parseOnly puzzleP puzzleData)
+      let subject = parseOnly puzzleP puzzleData
       it "should solve to ACHOQRXSEKUGMYIWDZLNBFTJVP" $ (solve <$> subject) `shouldBe` Right "ACHOQRXSEKUGMYIWDZLNBFTJVP"
       it "should not solve to ACHOQRXSKEUGMYWIDZLNTBFJVP" $ (solve <$> subject) `shouldNotBe` Right "ACHOQRXSKEUGMYWIDZLNTBFJVP"
       it "should find roots" $ (findRoots . concat . solution) <$> subject `shouldBe` Right "AHQX"
   -- context  "solving 2" $ do
-  context "directDeps" $ do
-    it "should world for a single one" $ (directDeps) [('A', 'C')] `shouldBe` ['A' :-> ['C']]
+  context "directDeps" $ 
+    it "should world for a single one" $ directDeps [('A', 'C')] `shouldBe` ['A' :-> ['C']]
