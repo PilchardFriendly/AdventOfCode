@@ -17,7 +17,8 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: lts-13.1
+# resolver: lts-13.
+resolver: lts-18.20
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -33,7 +34,7 @@ resolver: lts-13.1
 #  - auto-update
 #  - wai
 packages:
-- .
+  - .
 # Dependency packages to be pulled from upstream that are not in the resolver
 # using the same syntax as the packages field.
 # (e.g., acme-missiles-0.3)
@@ -62,3 +63,6 @@ packages:
 #
 # Allow a newer minor version of GHC than the snapshot specifies
 # compiler-check: newer-minor
+
+ghc-options:
+  "$everything": -haddock

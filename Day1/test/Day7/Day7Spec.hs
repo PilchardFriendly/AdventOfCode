@@ -87,7 +87,19 @@ solve = tmp  . solution
         (minp', q') = dequeueAQ q -- minp' could be less than next
         s' = (s <>) $ (maybe mempty mkDistinct) $ mfilter (next >=)  minp'
 
+solution2 ::  Integer -> Integer -> [Dependencies] -> Integer
+solution2 m n [] =  0
+solution2 m n ds =  sum $ fmap (cost n) ds
+  where
+    cost :: Integer -> Dependencies -> Integer
+    cost minCost (p :-> _ ) = (minCost - (toInteger $ ord 'A')) + (toInteger $ ord p) + 1
 
+type Worker = Integer
+type Clock = Integer
+data Solution2 = Solution2 {
+  _queue :: ActivityQueue Part,
+  _clock :: Clock
+}
 spec :: Spec
 spec = describe "Sleigh" $ do
   let exampleText = [here|
@@ -116,6 +128,16 @@ Step F must be finished before step E can begin.
       it "should solve to ACHOQRXSEKUGMYIWDZLNBFTJVP" $ (solve <$> subject) `shouldBe` Right "ACHOQRXSEKUGMYIWDZLNBFTJVP"
       it "should not solve to ACHOQRXSKEUGMYWIDZLNTBFJVP" $ (solve <$> subject) `shouldNotBe` Right "ACHOQRXSKEUGMYWIDZLNTBFJVP"
       it "should find roots" $ (findRoots . concat . solution) <$> subject `shouldBe` Right "AHQX"
-  -- context  "solving 2" $ do
+  context  "solving 2" $ do
+    context "degenerate" $ do
+      let deps = []
+      it "should take no time" $ (solution2 2 60 deps) `shouldBe` 0
+
+    context "2 worker, single item" $ do
+      let deps = [ 'A' :-> [] ]
+      it "should take 61 minutes with 2 workers" $ (solution2 2 60 deps) `shouldBe` 61
+    -- context "2 workers " $ do
+    --   let deps = [ 'A' :-> ['B', 'C']]
+    --   it "should take (61 + max( 62, 63)) minss with 2 workers" $ (solution2 2 60 deps) `shouldBe` 124
   context "directDeps" $ 
     it "should world for a single one" $ directDeps [('A', 'C')] `shouldBe` ['A' :-> ['C']]
