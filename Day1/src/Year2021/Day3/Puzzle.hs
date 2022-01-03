@@ -5,16 +5,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Year2021.Day3.Puzzle where
 
-import Control.Lens (Getter, Iso', iso, over, review, view, (^.))
-import Control.Lens.TH (makeFieldsNoPrefix, makeLenses)
 import Data.Attoparsec.Text (Parser, choice, count, decimal, endOfLine, many', many1, parseOnly, sepBy, sepBy1, signed, string)
 import Data.Bits (Bits (bit, complement, setBit, shift, shiftL, shiftR, testBit, xor, zeroBits, (.&.), (.|.)), FiniteBits)
 import Data.Data (Proxy (Proxy))
-import Data.Finite (Finite, finite, getFinite, modulo)
+import Data.Finite (Finite, finite, finites, getFinite, modulo)
+import Data.Foldable (fold)
+import Data.Function (on)
 import Data.Functor (($>))
 import Data.Functor.Sum (Sum)
 import Data.List (sortOn, unfoldr)
@@ -27,28 +28,29 @@ import Year2021.Day3.Input (puzzleData)
 
 data Day3 = Day3
 
+-- Finites
+maxFinite :: forall n. KnownNat n => Finite n
+maxFinite = last finites
+
+-- Bits
+shiftL1 :: Bits a => a -> a
+shiftL1 = flip shiftL 1
+
+shiftR1 :: Bits a => a -> a
+shiftR1 = flip shiftR 1
+
+-- Advent
 newtype Diagnostic (n :: Nat) = Diagnostic Int
   deriving (Show)
 
-newtype Score (n :: Nat) = Score Int
-  deriving (Show)
+mapBitsToSized :: forall n b. KnownNat n => (Finite n -> Bool -> b) -> Diagnostic n -> Sized.Vector n b
+mapBitsToSized f (Diagnostic a) = Sized.unfoldrN go maxFinite
+  where
+    go :: Finite n -> (b, Finite n)
+    go fn = (,) (f fn $ testBit a (fromIntegral fn)) (fn - finite 1)
 
 diagnostic :: forall n. KnownNat n => Int -> Diagnostic n
 diagnostic = Diagnostic
-
-newtype Analysis (n :: Nat) = Analysis (Int, Sized.Vector n Int)
-  deriving (Show)
-
-instance Semigroup (Analysis n) where
-  (<>) (Analysis (a1, a2)) (Analysis (b1, b2)) = Analysis (a1 + b1, Sized.zipWith (+) a2 b2)
-
--- >>> (Analysis (5, Sized.fromTuple(1,2,3,4,5))) <> (Analysis (5, Sized.fromTuple (1,2,3,4,5)))
--- Analysis (10,Vector [2,4,6,8,10])
-instance KnownNat n => Monoid (Analysis n) where
-  mempty = Analysis (0, Sized.replicate 0)
-
-parser :: Parser [Diagnostic n]
-parser = sepBy1 diagnosticParser endOfLine
 
 diagnosticParser :: Parser (Diagnostic n)
 diagnosticParser = go <$> digits
@@ -65,24 +67,39 @@ diagnosticParser = go <$> digits
             string "1" $> bit 1
           ]
 
+newtype Score (n :: Nat) = Score Int
+  deriving (Show)
+
+-- >>> (Analysis @5 (5, Sized.fromTuple(1,2,3,4,5))) <> (Analysis (5, Sized.fromTuple (1,2,3,4,5)))
+-- Analysis (10,Vector [2,4,6,8,10])
+
 parse :: forall n. KnownNat n => Text -> Either String [Diagnostic n]
 parse = parseOnly parser
+
+parser :: Parser [Diagnostic n]
+parser = sepBy1 diagnosticParser endOfLine
 
 -- >>> parse "00000\n10000\n00001"
 -- Right [Diagnostic 0,Diagnostic 16,Diagnostic 1]
 
-shiftL1 :: Bits a => a -> a
-shiftL1 = flip shiftL 1
+newtype Analysis (n :: Nat) = Analysis (Int, Sized.Vector n Int)
+  deriving (Show)
 
-shiftR1 :: Bits a => a -> a
-shiftR1 = flip shiftR 1
+instance Semigroup (Analysis n) where
+  (<>) (Analysis (a1, a2)) (Analysis (b1, b2)) = Analysis (a1 + b1, Sized.zipWith (+) a2 b2)
+
+instance KnownNat n => Monoid (Analysis n) where
+  mempty = Analysis (0, Sized.replicate 0)
 
 analyse :: forall n. KnownNat n => Diagnostic n -> Analysis n
-analyse (Diagnostic d) = Analysis (1, Sized.unfoldrN go $ fromIntegral (natVal (Proxy @n) -1))
+analyse d = Analysis $ (1,) $ mapBitsToSized go d
   where
-    go :: Int -> (Int, Int)
-    go a | testBit d a = (1, a - 1)
-    go a = (0, a -1)
+    go :: Finite n -> Bool -> Int
+    go fn True = 1
+    go fn _ = 0
+
+analyseAll :: forall n f. (KnownNat n, Foldable f) => f (Diagnostic n) -> Analysis n
+analyseAll = foldMap analyse
 
 -- >>> analyse @5 <$> [Diagnostic (0), Diagnostic (16), Diagnostic (31)]
 -- [Analysis (1,Vector [0,0,0,0,0]),Analysis (1,Vector [1,0,0,0,0]),Analysis (1,Vector [1,1,1,1,1])]
@@ -99,8 +116,8 @@ gamma (Analysis (n, counts)) = shiftR1 (Sized.foldr go 0 $ Sized.reverse counts)
     go a b | 2 * a >= n = shiftL1 (setBit b 0)
     go a b = shiftL1 b
 
-carbon :: Analysis n -> Int
-carbon (Analysis (n, counts)) = shiftR1 (Sized.foldr go 0 $ Sized.reverse counts)
+epsilon :: Analysis n -> Int
+epsilon (Analysis (n, counts)) = shiftR1 (Sized.foldr go 0 $ Sized.reverse counts)
   where
     go :: Int -> Int -> Int
     go a b | 2 * a < n = shiftL1 (setBit b 0)
@@ -121,69 +138,65 @@ solution gr = g * (epsilonC - g)
 -- [30]
 
 solve :: forall n. KnownNat n => [Diagnostic n] -> Int
-solve = solution . mconcat . fmap analyse
+solve = solution . analyseAll
 
 solve2 :: forall n. KnownNat n => [Diagnostic n] -> Maybe Int
 solve2 = solution2
 
 solution2 :: forall n. KnownNat n => [Diagnostic n] -> Maybe Int
 solution2 ds =
-  calc <$> go oxygenScore
-    <*> go carbonScore
+  calc <$> go (summarise oxygenScore)
+    <*> go (summarise carbonScore)
   where
     calc :: Diagnostic oxy -> Diagnostic carbon -> Int
     calc (Diagnostic ox) (Diagnostic carbon) = ox * carbon
-    go :: (Analysis n -> Score n) -> Maybe (Diagnostic n)
-    go f = step2 f ds
 
-step2 :: forall n. KnownNat n => (Analysis n -> Score n) -> [Diagnostic n] -> Maybe (Diagnostic n)
-step2 f ds = go (finite $ fromIntegral (natVal (Proxy @n)) -1) (Right ds)
+    summarise f = f . analyseAll
+    go :: ([Diagnostic n] -> Score n) -> Maybe (Diagnostic n)
+    go f = sieve f ds
+
+sieve :: forall n. KnownNat n => ([Diagnostic n] -> Score n) -> [Diagnostic n] -> Maybe (Diagnostic n)
+sieve summarise ds = go maxFinite (Right ds)
   where
-    go fn (Right rs) = go (fn - finite 1) $ step2' summary (select fn) rs
+    go fn (Right rs) = go (fn - finite 1) $ extract $ summariseAndFilter summarise (bitEq fn) rs
     go fn (Left r) = r
-    summary = f . mconcat . fmap analyse
-    select fn = flip (bitEq fn)
 
--- >>> step2 oxygenScore exampleDiagnostics
+-- >>> sieve (oxygenScore . analyseAll) exampleDiagnostics
 -- Just (Diagnostic 23)
 
--- >>> step2 carbonScore exampleDiagnostics
+-- >>> sieve (carbonScore . analyseAll) exampleDiagnostics
 -- Just (Diagnostic 10)
 
-step2' :: ([a] -> b) -> (a -> b -> Bool) -> [a] -> Either (Maybe a) [a]
-step2' f p = go . results
-  where
-    results = summariseAndFilter f p
-    go [] = Left Nothing
-    go [d] = Left $ Just d
-    go ds = Right ds
+extract :: [a] -> Either (Maybe a) [a]
+extract [] = Left Nothing
+extract [x] = Left $ Just x
+extract xs = Right xs
 
 bitEq :: forall n. KnownNat n => Finite n -> Score n -> Diagnostic n -> Bool
-bitEq fn (Score ref) (Diagnostic d) = testBit ref minBit == testBit d minBit
+bitEq fn (Score ref) (Diagnostic d) = equating ref d
   where
-    minBit = fromIntegral (getFinite fn)
-
-score :: forall n. KnownNat n => Int -> Score n
-score = Score
+    equating :: Int -> Int -> Bool
+    equating = on (==) (`testBit` minBit)
+    minBit = fromIntegral fn
 
 oxygenScore :: Analysis n -> Score n
 oxygenScore = Score . gamma
 
 carbonScore :: Analysis n -> Score n
-carbonScore = Score . carbon
+carbonScore = Score . epsilon
 
 -- >>> oxygenScore <$> [(Analysis @5 (1, Sized.fromTuple (1::Int,1,1,1,1))), (Analysis @5 (5, Sized.fromTuple(2::Int, 4, 6, 8, 10)))]
 -- [Score 31,Score 15]
 -- >>> carbonScore <$> [(Analysis @5 (1, Sized.fromTuple (1::Int,1,1,1,1))), (Analysis @5 (5, Sized.fromTuple(2::Int, 4, 6, 8, 10)))]
 -- [Score 0,Score 16]
 
-summariseAndFilter :: ([a] -> b) -> (a -> b -> Bool) -> [a] -> [a]
-summariseAndFilter f p as = filter (`p` f as) as
+summariseAndFilter :: ([a] -> b) -> (b -> a -> Bool) -> [a] -> [a]
+summariseAndFilter f p as = filter (p $ f as) as
 
 -- >>> summariseAndFilter (\as -> div (sum as) (length as)) (\a b -> a < b) $ [1,2,3,4,5]
--- [1,2]
+-- [4,5]
 -- >>> summariseAndFilter (\as -> div (sum as) (length as)) (\a b -> a >= b) $ [1,2,3,4,5]
--- [3,4,5]
+-- [1,2,3]
 
 -- >>> solve <$> parse @12 puzzleData
 -- Right 4103154
@@ -196,7 +209,7 @@ summariseAndFilter f p as = filter (`p` f as) as
 -- >>> fmap (analyse @5 . Diagnostic) example
 -- [Analysis (1,Vector [0,0,1,0,0]),Analysis (1,Vector [1,1,1,1,0]),Analysis (1,Vector [1,0,1,1,0]),Analysis (1,Vector [1,0,1,1,1]),Analysis (1,Vector [1,0,1,0,1]),Analysis (1,Vector [0,1,1,1,1]),Analysis (1,Vector [0,0,1,1,1]),Analysis (1,Vector [1,1,1,0,0]),Analysis (1,Vector [1,0,0,0,0]),Analysis (1,Vector [1,1,0,0,1]),Analysis (1,Vector [0,0,0,1,0]),Analysis (1,Vector [0,1,0,1,0])]
 
--- >>> mconcat $ fmap (analyse @5  . Diagnostic) example
+-- >>> analyseAll @5 $ diagnostic <$> example
 -- Analysis (12,Vector [7,5,8,7,5])
 
 -- >>> solve2 <$> parse @12 puzzleData
